@@ -5,7 +5,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -40,21 +39,34 @@ func sendMessage(message string, url string, update Update) {
 	log.Println(string(body))
 }
 
-func trapCommand(url string, update Update) {
-	if strings.ContainsAny(update.Message.Text, "traps") {
-		go sendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", url, update)
+// Builds and returns commands with url.
+func getCommands(url string) []func(Update) {
+	return []func(update Update){
+
+		// Kill command
+		func(update Update) {
+			commands := strings.SplitAfter(update.Message.Text, "kill")
+			if len(commands) > 1 {
+				go sendMessage(strings.TrimSpace(commands[1])+" teabagged a piranha tank", url, update)
+			}
+		},
+
+		// Traps command
+		func(update Update) {
+			if strings.Contains(update.Message.Text, "traps") {
+				go sendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", url, update)
+			}
+		},
 	}
 }
 
-func executeCommand(url string, update Update) {
-	trapCommand(url, update)
-}
-
 // Create our routes
-func initRoutes(router *gin.Engine, teleurl string, logger func(*gin.Context)) {
+func initRoutes(router *gin.Engine, teleurl string) {
+
+	commands := getCommands(teleurl)
 
 	router.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "Telegram Bot")
+		c.String(http.StatusOK, "Telegram Bot is running!")
 	})
 
 	router.POST("/new-message", func(c *gin.Context) {
@@ -64,7 +76,11 @@ func initRoutes(router *gin.Engine, teleurl string, logger func(*gin.Context)) {
 
 		if bindError == nil {
 			c.JSON(http.StatusOK, update)
-			executeCommand(teleurl, update)
+
+			// Executes commands
+			for _, command := range commands {
+				command(update)
+			}
 		} else {
 			log.Println(bindError)
 			c.JSON(http.StatusBadRequest, update)
@@ -76,9 +92,8 @@ func initRoutes(router *gin.Engine, teleurl string, logger func(*gin.Context)) {
 
 func main() {
 
-	port := os.Getenv("PORT")
-
 	// Can't run a server without a port
+	port := os.Getenv("PORT")
 	if port == "" {
 		log.Fatal("PORT environment variable was not set")
 		return
@@ -95,27 +110,9 @@ func main() {
 	// Recover from errors and return 500
 	r.Use(gin.Recovery())
 
-	// Set Logger
-	var logger func(*gin.Context)
-	if os.Getenv("APP_ENV") == "production" {
-		log.Println("Running api server in production mode")
-		logger = func(c *gin.Context) {}
-	} else {
-		log.Println("Running api server in debug mode")
-		logger = func(c *gin.Context) {
-			var data, err = c.GetRawData()
-			if err == nil {
-				fmt.Println("\nData recieved: ")
-				fmt.Println(string(data))
-			} else {
-				fmt.Println("Error attempting to log data")
-			}
-		}
-	}
-
 	// Start server
 	teleurl := "https://api.telegram.org/bot" + os.Getenv("TELE_KEY") + "/"
-	initRoutes(r, teleurl, logger)
+	initRoutes(r, teleurl)
 	r.Run(":" + port)
 
 }
