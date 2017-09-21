@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -41,13 +42,30 @@ func sendMessage(message string, url string, update Update) {
 
 // Builds and returns commands with url.
 func getCommands(url string) []func(Update) {
+
+	killStatements := []string{
+		" teabagged a piranha tank",
+		" died of a heart attack while watching hentia",
+		" just got back from yiffing",
+		" was bitten by a horse",
+		" was bent over and given a slap on the bottom",
+		" changed their major to BIS",
+		" got drilled",
+		" got paddeled",
+		" drank bleach",
+		" was put on a group project with kleiderar",
+		" got hired by lockheed",
+		" was forever shunned by the resume gods",
+	}
+
 	return []func(update Update){
 
 		// Kill command
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "kill")
 			if len(commands) > 1 {
-				go sendMessage(strings.TrimSpace(commands[1])+" teabagged a piranha tank", url, update)
+				n := rand.Int() % len(killStatements)
+				go sendMessage(strings.TrimSpace(commands[1])+killStatements[n], url, update)
 			}
 		},
 
