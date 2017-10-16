@@ -5,6 +5,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -15,6 +16,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// A typical resonse when searching reddit
+type RedditResponse struct {
+	Data struct {
+		Children []struct {
+			Data *Submission
+		}
+	}
+}
 
 // Resposible for sending a message to the appropriate group chat
 func sendMessage(message string, url string, update Update) {
@@ -38,6 +48,42 @@ func sendMessage(message string, url string, update Update) {
 	body, err := ioutil.ReadAll(resp.Body)
 	log.Println("\nTelegram Said: ")
 	log.Println(string(body))
+}
+
+func rule34Search(term string, url string, update Update) {
+	log.Println("searching rule 34: " + term)
+	searchURL := "https://www.reddit.com/r/rule34/search.json?q=" + term + "&restrict_sr=on&sort=relevance&t=all"
+	resp, err := http.Get(searchURL)
+
+	if err != nil {
+		log.Println("Error Searching Reddit")
+	}
+
+	defer resp.Body.Close()
+
+	r := RedditResponse{}
+	body, err := ioutil.ReadAll(resp.Body)
+	log.Printf(string(body))
+	json.Unmarshal([]byte(body), &r)
+	if err != nil {
+		log.Println("Error Parsing")
+	}
+
+	submissions := make([]*Submission, len(r.Data.Children))
+	for i, child := range r.Data.Children {
+		submissions[i] = child.Data
+	}
+
+	log.Println("Succesful")
+	log.Println(submissions)
+
+	if len(submissions) > 0 {
+		log.Println("How's this? : " + submissions[0].URL)
+		// sendMessage("How's this? : "+submissions[0].URL, url, update)
+	} else {
+		log.Println("Couldn't find any porn for: " + term)
+		// sendMessage("Couldn't find any porn for: "+term, url, update)
+	}
 }
 
 // Builds and returns commands with url.
@@ -73,6 +119,14 @@ func getCommands(url string) []func(Update) {
 		func(update Update) {
 			if strings.Contains(update.Message.Text, "traps") {
 				go sendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", url, update)
+			}
+		},
+
+		// Rule34 command
+		func(update Update) {
+			commands := strings.SplitAfter(update.Message.Text, "rule34")
+			if len(commands) > 1 {
+				go rule34Search(strings.TrimSpace(commands[1]), url, update)
 			}
 		},
 	}
