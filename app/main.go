@@ -100,7 +100,6 @@ func getCommands(url string) []func(Update) {
 		" got paddeled",
 		" drank bleach",
 		" was put on a group project with kleiderar",
-		" got hired by lockheed",
 		" was forever shunned by the resume gods",
 		" became PayPay's bitch",
 		" was yiffed by Chan",
@@ -109,6 +108,11 @@ func getCommands(url string) []func(Update) {
 		" had their appendix try to kill them",
 		" voiced their political, religious, or other personal beliefs in resistance",
 		" was punished for not conforming",
+		" is the filling to a Jane Hansen sandwich",
+		" suffocated in an amazon prime package",
+		" had their privates waxed with ducktape",
+		" was sent to Division 1 ICPC",
+		" took ALL of Ritters Monolithic Kernel",
 	}
 
 	return []func(update Update){
@@ -126,6 +130,13 @@ func getCommands(url string) []func(Update) {
 		func(update Update) {
 			if strings.Contains(update.Message.Text, "traps") {
 				go sendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", url, update)
+			}
+		},
+
+		// God command
+		func(update Update) {
+			if strings.Contains(update.Message.Text, "god") {
+				go sendMessage("GOD IS GREAT", url, update)
 			}
 		},
 
