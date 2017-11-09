@@ -79,10 +79,10 @@ func rule34Search(term string, url string, update Update) {
 
 	if len(submissions) > 0 {
 		log.Println("How's this? : " + submissions[0].URL)
-		// sendMessage("How's this? : "+submissions[0].URL, url, update)
+		sendMessage("How's this? : "+submissions[0].URL, url, update)
 	} else {
 		log.Println("Couldn't find any porn for: " + term)
-		// sendMessage("Couldn't find any porn for: "+term, url, update)
+		sendMessage("Couldn't find any porn for: "+term, url, update)
 	}
 }
 
@@ -100,8 +100,12 @@ func getCommands(url string) []func(Update) {
 		" got paddeled",
 		" drank bleach",
 		" was put on a group project with kleiderar",
-		" got hired by lockheed",
 		" was forever shunned by the resume gods",
+		" is the filling to a Jane Hansen sandwich",
+		" suffocated in an amazon prime package",
+		" had their privates waxed with ducktape",
+		" was sent to Division 1 ICPC",
+		" took ALL of Ritters Monolithic Kernel",
 	}
 
 	return []func(update Update){
@@ -119,6 +123,13 @@ func getCommands(url string) []func(Update) {
 		func(update Update) {
 			if strings.Contains(update.Message.Text, "traps") {
 				go sendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", url, update)
+			}
+		},
+
+		// God command
+		func(update Update) {
+			if strings.Contains(update.Message.Text, "god") {
+				go sendMessage("GOD IS GREAT", url, update)
 			}
 		},
 
