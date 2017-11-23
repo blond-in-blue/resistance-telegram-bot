@@ -17,7 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// A typical resonse when searching reddit
+// RedditResponse A typical resonse when searching reddit
 type RedditResponse struct {
 	Data struct {
 		Children []struct {
@@ -26,13 +26,21 @@ type RedditResponse struct {
 	}
 }
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // Resposible for sending a message to the appropriate group chat
 func sendMessage(message string, url string, update Update) {
 
 	// Send Message to telegram's api
 	resp, err := http.Post(url+"sendMessage", "application/json", bytes.NewBuffer([]byte(`{
 		"chat_id": `+strconv.FormatInt(update.Message.Chat.ID, 10)+`,
-		"text": "`+message+`"
+		"text": "`+message+`",
+		"parse_mode": "HTML"
 	}`)))
 
 	// Catch errors
@@ -84,6 +92,78 @@ func rule34Search(term string, url string, update Update) {
 		log.Println("Couldn't find any porn for: " + term)
 		// sendMessage("Couldn't find any porn for: "+term, url, update)
 	}
+}
+
+func pokedexSerach(term string, url string, update Update) {
+
+	log.Println("searching pokedex: " + term)
+	searchURL := "https://pokeapi.co/api/v2/pokemon/" + term
+	resp, err := http.Get(searchURL)
+
+	if err != nil {
+		log.Println("Error Searching Pokedex")
+		sendMessage("Error Searching Pokedex", url, update)
+		return
+	}
+
+	defer resp.Body.Close()
+
+	r := PokemonSearchResponse{}
+	body, err := ioutil.ReadAll(resp.Body)
+	//log.Printf(string(body))
+	json.Unmarshal([]byte(body), &r)
+	if err != nil {
+		log.Println("Error Parsing")
+		sendMessage("Error Reading Response From Pokedex", url, update)
+		return
+	}
+
+	returnMessage := "<b>" + strings.ToUpper(r.Name) + "</b>\n<i>"
+
+	// Get the types
+	for i := 0; i < len(r.Types); i++ {
+		returnMessage += r.Types[i].Type.Name
+		if i < len(r.Types)-1 {
+			returnMessage += " - "
+		}
+	}
+
+	// basic info
+	returnMessage += " type\n</i>Weight: " + strconv.Itoa(r.Weight) + "\n"
+	returnMessage += "Height: " + strconv.Itoa(r.Height) + "\n"
+	returnMessage += "Base Exp: " + strconv.Itoa(r.BaseExperience) + "\n"
+
+	// Get the moves
+	returnMessage += "\nMoves: <i>"
+	numberMovesToList := min(len(r.Moves), 4)
+	for i := 0; i < numberMovesToList; i++ {
+		returnMessage += r.Moves[i].Move.Name
+		if i < numberMovesToList-1 {
+			returnMessage += ", "
+		}
+	}
+
+	if len(r.Moves) > 4 {
+		returnMessage += ", and " + strconv.Itoa(len(r.Moves)-4) + " others"
+	}
+
+	// Get the moves
+	returnMessage += "</i>\n\nAbilities: <i>"
+	numberMovesToList = min(len(r.Abilities), 4)
+	for i := 0; i < numberMovesToList; i++ {
+		returnMessage += r.Abilities[i].Ability.Name
+		if i < numberMovesToList-1 {
+			returnMessage += ", "
+		}
+	}
+
+	if len(r.Abilities) > 4 {
+		returnMessage += ", and " + strconv.Itoa(len(r.Abilities)-4) + " others"
+	}
+
+	returnMessage += "</i>\n\n" + r.Sprites.FrontDefault
+
+	sendMessage(returnMessage, url, update)
 }
 
 // Builds and returns commands with url.
@@ -145,6 +225,14 @@ func getCommands(url string) []func(Update) {
 			commands := strings.SplitAfter(update.Message.Text, "rule34")
 			if len(commands) > 1 {
 				go rule34Search(strings.TrimSpace(commands[1]), url, update)
+			}
+		},
+
+		//pokedexSerach
+		func(update Update) {
+			commands := strings.SplitAfter(update.Message.Text, "pokedex")
+			if len(commands) > 1 {
+				go pokedexSerach(strings.TrimSpace(commands[1]), url, update)
 			}
 		},
 	}
