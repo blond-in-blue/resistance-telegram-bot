@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,13 +25,6 @@ type RedditResponse struct {
 			Data *Submission
 		}
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // Resposible for sending a message to the appropriate group chat
@@ -94,106 +88,8 @@ func rule34Search(term string, url string, update Update) {
 	}
 }
 
-func pokedexSerach(term string, url string, update Update) {
-
-	log.Println("searching pokedex: " + term)
-	searchURL := "https://pokeapi.co/api/v2/pokemon/" + term
-	resp, err := http.Get(searchURL)
-
-	if err != nil {
-		log.Println("Error Searching Pokedex")
-		sendMessage("Error Searching Pokedex", url, update)
-		return
-	}
-
-	defer resp.Body.Close()
-
-	r := PokemonSearchResponse{}
-	body, err := ioutil.ReadAll(resp.Body)
-	//log.Printf(string(body))
-	json.Unmarshal([]byte(body), &r)
-	if err != nil {
-		log.Println("Error Parsing")
-		sendMessage("Error Reading Response From Pokedex", url, update)
-		return
-	}
-
-	returnMessage := "<b>" + strings.ToUpper(r.Name) + "</b>\n<i>"
-
-	// Get the types
-	for i := 0; i < len(r.Types); i++ {
-		returnMessage += r.Types[i].Type.Name
-		if i < len(r.Types)-1 {
-			returnMessage += " - "
-		}
-	}
-
-	// basic info
-	returnMessage += " type\n</i>Weight: " + strconv.Itoa(r.Weight) + "\n"
-	returnMessage += "Height: " + strconv.Itoa(r.Height) + "\n"
-	returnMessage += "Base Exp: " + strconv.Itoa(r.BaseExperience) + "\n"
-
-	// Get the moves
-	returnMessage += "\nMoves: <i>"
-	numberMovesToList := min(len(r.Moves), 4)
-	for i := 0; i < numberMovesToList; i++ {
-		returnMessage += r.Moves[i].Move.Name
-		if i < numberMovesToList-1 {
-			returnMessage += ", "
-		}
-	}
-
-	if len(r.Moves) > 4 {
-		returnMessage += ", and " + strconv.Itoa(len(r.Moves)-4) + " others"
-	}
-
-	// Get the moves
-	returnMessage += "</i>\n\nAbilities: <i>"
-	numberMovesToList = min(len(r.Abilities), 4)
-	for i := 0; i < numberMovesToList; i++ {
-		returnMessage += r.Abilities[i].Ability.Name
-		if i < numberMovesToList-1 {
-			returnMessage += ", "
-		}
-	}
-
-	if len(r.Abilities) > 4 {
-		returnMessage += ", and " + strconv.Itoa(len(r.Abilities)-4) + " others"
-	}
-
-	returnMessage += "</i>\n\n" + r.Sprites.FrontDefault
-
-	sendMessage(returnMessage, url, update)
-}
-
 // Builds and returns commands with url.
 func getCommands(url string) []func(Update) {
-
-	killStatements := []string{
-		" teabagged a piranha tank",
-		" died of a heart attack while watching hentia",
-		" just got back from yiffing",
-		" was bitten by a horse",
-		" was bent over and given a slap on the bottom",
-		" changed their major to BIS",
-		" got drilled",
-		" got paddeled",
-		" drank bleach",
-		" was put on a group project with kleiderar",
-		" was forever shunned by the resume gods",
-		" became PayPay's bitch",
-		" was yiffed by Chan",
-		" was ignored by Eli",
-		" was kicked from resistance",
-		" had their appendix try to kill them",
-		" voiced their political, religious, or other personal beliefs in resistance",
-		" was punished for not conforming",
-		" is the filling to a Jane Hansen sandwich",
-		" suffocated in an amazon prime package",
-		" had their privates waxed with ducktape",
-		" was sent to Division 1 ICPC",
-		" took ALL of Ritters Monolithic Kernel",
-	}
 
 	return []func(update Update){
 
@@ -215,7 +111,7 @@ func getCommands(url string) []func(Update) {
 
 		// God command
 		func(update Update) {
-			if strings.Contains(update.Message.Text, "god") {
+			if strings.Contains(update.Message.Text, "gg") {
 				go sendMessage("GOD IS GREAT", url, update)
 			}
 		},
@@ -241,31 +137,54 @@ func getCommands(url string) []func(Update) {
 // Create our routes
 func initRoutes(router *gin.Engine, teleurl string) {
 
-	commands := getCommands(teleurl)
-
 	router.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "Telegram Bot is running!")
 	})
 
-	router.POST("/new-message", func(c *gin.Context) {
+}
 
-		var update Update
-		bindError := c.BindJSON(&update)
+func listenForUpdates(teleurl string) {
+	var lastUpdate = -1
 
-		if bindError == nil {
-			c.JSON(http.StatusOK, update)
+	commands := getCommands(teleurl)
 
-			// Executes commands
+	for {
+		time.Sleep(time.Second)
+
+		resp, err := http.Get(teleurl + "getUpdates?offset=" + strconv.Itoa(lastUpdate))
+		if err != nil {
+			log.Println("Error Obtaining Updates")
+			log.Println(err.Error())
+			return
+		}
+
+		defer resp.Body.Close()
+
+		var updates BatchUpdates
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Println("Error reading body")
+			log.Println(err.Error())
+			return
+		}
+
+		err = json.Unmarshal([]byte(body), &updates)
+		if err != nil {
+			log.Println("Error Parsing")
+			log.Println(err.Error())
+			return
+		}
+
+		// Dispatch incoming messages to appropriate functions
+		for _, update := range updates.Result {
+			log.Println("Msg: " + update.Message.Text)
+			lastUpdate = update.UpdateID + 1
 			for _, command := range commands {
 				command(update)
 			}
-		} else {
-			log.Println(bindError)
-			c.JSON(http.StatusBadRequest, update)
 		}
 
-	})
-
+	}
 }
 
 func main() {
@@ -277,7 +196,7 @@ func main() {
 		return
 	}
 
-	log.Println("Starting bot...")
+	log.Println("Starting bot!")
 
 	// Create our engine
 	r := gin.New()
@@ -290,6 +209,9 @@ func main() {
 
 	// Start server
 	teleurl := "https://api.telegram.org/bot" + os.Getenv("TELE_KEY") + "/"
+
+	go listenForUpdates(teleurl)
+
 	initRoutes(r, teleurl)
 	r.Run(":" + port)
 

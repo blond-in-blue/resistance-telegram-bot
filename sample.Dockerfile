@@ -6,12 +6,10 @@ ENV APP_ENV $app_env
 COPY ./app /go/src/github.com/user/myProject/app
 WORKDIR /go/src/github.com/user/myProject/app
 
-RUN go get ./
-RUN go build
+RUN go get github.com/codegangsta/gin
+RUN go-wrapper download
+RUN go-wrapper install
 
-ENV PORT 80
 ENV TELE_KEY <insert_key>
 
-EXPOSE 80
-
-CMD app
+EXPOSE 3000

@@ -8,3 +8,9 @@ type Update struct {
 	ChannelPost       *Message `json:"channel_post"`
 	EditedChannelPost *Message `json:"edited_channel_post"`
 }
+
+// All updates recieved from getUpdate
+type BatchUpdates struct {
+	Ok     bool     `json:"ok"`
+	Result []Update `json:"result"`
+}
