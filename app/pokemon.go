@@ -71,14 +71,14 @@ func min(a, b int) int {
 	return b
 }
 
-func pokedexSerach(term string, url string, update Update) {
+func pokedexSerach(term string, url string, update Update, errorLogger func(string)) {
 
 	log.Println("searching pokedex: " + term)
 	searchURL := "https://pokeapi.co/api/v2/pokemon/" + strings.ToLower(term)
 	resp, err := http.Get(searchURL)
 
 	if err != nil {
-		log.Println("Error Searching Pokedex")
+		errorLogger("Error Searching Pokedex: " + err.Error())
 		sendMessage("Error Searching Pokedex", url, update)
 		return
 	}
@@ -89,7 +89,7 @@ func pokedexSerach(term string, url string, update Update) {
 	body, err := ioutil.ReadAll(resp.Body)
 	json.Unmarshal([]byte(body), &r)
 	if err != nil {
-		log.Println("Error Parsing")
+		errorLogger("Error Parsing Pokedex Response: " + err.Error())
 		sendMessage("Error Reading Response From Pokedex", url, update)
 		return
 	}

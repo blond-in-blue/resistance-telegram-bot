@@ -52,13 +52,13 @@ func sendMessage(message string, url string, update Update) {
 	log.Println(string(body))
 }
 
-func rule34Search(term string, url string, update Update) {
+func rule34Search(term string, url string, update Update, errorLogger func(string)) {
 	log.Println("searching rule 34: " + term)
 	searchURL := "https://www.reddit.com/r/rule34/search.json?q=" + term + "&restrict_sr=on&sort=relevance&t=all"
 	resp, err := http.Get(searchURL)
 
 	if err != nil {
-		log.Println("Error Searching Reddit")
+		errorLogger("Error Searching Reddit: " + err.Error())
 	}
 
 	defer resp.Body.Close()
@@ -68,7 +68,7 @@ func rule34Search(term string, url string, update Update) {
 	log.Printf(string(body))
 	json.Unmarshal([]byte(body), &r)
 	if err != nil {
-		log.Println("Error Parsing")
+		errorLogger("Error Parsing Reddit Response: " + err.Error())
 	}
 
 	submissions := make([]*Submission, len(r.Data.Children))
@@ -89,7 +89,7 @@ func rule34Search(term string, url string, update Update) {
 }
 
 // Builds and returns commands with url.
-func getCommands(url string) []func(Update) {
+func getCommands(url string, errorLogger func(string)) []func(Update) {
 
 	return []func(update Update){
 
@@ -120,7 +120,7 @@ func getCommands(url string) []func(Update) {
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "rule34")
 			if len(commands) > 1 {
-				go rule34Search(strings.TrimSpace(commands[1]), url, update)
+				go rule34Search(strings.TrimSpace(commands[1]), url, update, errorLogger)
 			}
 		},
 
@@ -128,33 +128,39 @@ func getCommands(url string) []func(Update) {
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "pokedex")
 			if len(commands) > 1 {
-				go pokedexSerach(strings.TrimSpace(commands[1]), url, update)
+				go pokedexSerach(strings.TrimSpace(commands[1]), url, update, errorLogger)
 			}
 		},
 	}
 }
 
 // Create our routes
-func initRoutes(router *gin.Engine, teleurl string) {
+func initRoutes(router *gin.Engine, teleurl string, errors *[]string) {
+
+	router.LoadHTMLGlob("templates/*")
+
+	//errors := [...]string{"help", "me"}
 
 	router.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "Telegram Bot is running!")
+		c.HTML(http.StatusOK, "index.tmpl", gin.H{
+			"title":  "Telegram Bot",
+			"errors": errors,
+		})
 	})
 
 }
 
-func listenForUpdates(teleurl string) {
+func listenForUpdates(teleurl string, errorLogger func(string)) {
 	var lastUpdate = -1
 
-	commands := getCommands(teleurl)
+	commands := getCommands(teleurl, errorLogger)
 
 	for {
 		time.Sleep(time.Second)
 
 		resp, err := http.Get(teleurl + "getUpdates?offset=" + strconv.Itoa(lastUpdate))
 		if err != nil {
-			log.Println("Error Obtaining Updates")
-			log.Println(err.Error())
+			errorLogger("Error Obtaining Updates: " + err.Error())
 			return
 		}
 
@@ -163,15 +169,13 @@ func listenForUpdates(teleurl string) {
 		var updates BatchUpdates
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Println("Error reading body")
-			log.Println(err.Error())
+			errorLogger("Error Reading Body: " + err.Error())
 			return
 		}
 
 		err = json.Unmarshal([]byte(body), &updates)
 		if err != nil {
-			log.Println("Error Parsing")
-			log.Println(err.Error())
+			errorLogger("Error Parsing Telegram getUpdates Response: " + err.Error())
 			return
 		}
 
@@ -198,6 +202,19 @@ func main() {
 
 	log.Println("Starting bot!")
 
+	errorMessages := []string{}
+	var errorLogger = func(msg string) {
+		t := time.Now()
+		log.Println(msg)
+		newMsg := [...]string{t.Format("Mon Jan _2 15:04:05 2006") + ": " + msg}
+
+		errorMessages = append(newMsg[:], errorMessages...)
+	}
+
+	teleurl := "https://api.telegram.org/bot" + os.Getenv("TELE_KEY") + "/"
+
+	go listenForUpdates(teleurl, errorLogger)
+
 	// Create our engine
 	r := gin.New()
 
@@ -207,12 +224,7 @@ func main() {
 	// Recover from errors and return 500
 	r.Use(gin.Recovery())
 
-	// Start server
-	teleurl := "https://api.telegram.org/bot" + os.Getenv("TELE_KEY") + "/"
-
-	go listenForUpdates(teleurl)
-
-	initRoutes(r, teleurl)
+	initRoutes(r, teleurl, &errorMessages)
 	r.Run(":" + port)
 
 }
