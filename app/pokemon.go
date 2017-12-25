@@ -74,7 +74,7 @@ func min(a, b int) int {
 func pokedexSerach(term string, url string, update Update) {
 
 	log.Println("searching pokedex: " + term)
-	searchURL := "https://pokeapi.co/api/v2/pokemon/" + term
+	searchURL := "https://pokeapi.co/api/v2/pokemon/" + strings.ToLower(term)
 	resp, err := http.Get(searchURL)
 
 	if err != nil {
@@ -110,8 +110,8 @@ func pokedexSerach(term string, url string, update Update) {
 	}
 
 	// basic info
-	returnMessage += " type\n</i>Weight: " + strconv.Itoa(r.Weight) + "\n"
-	returnMessage += "Height: " + strconv.Itoa(r.Height) + "\n"
+	returnMessage += " type\n</i>Weight: " + strconv.FormatFloat(float64(r.Weight)/10.0, 'f', -1, 32) + "kg\n"
+	returnMessage += "Height: " + strconv.FormatFloat(float64(r.Height)/10.0, 'f', -1, 32) + "m\n"
 	returnMessage += "Base Exp: " + strconv.Itoa(r.BaseExperience) + "\n"
 
 	// Get the moves
