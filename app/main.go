@@ -161,7 +161,6 @@ func listenForUpdates(teleurl string, errorLogger func(string)) {
 		resp, err := http.Get(teleurl + "getUpdates?offset=" + strconv.Itoa(lastUpdate))
 		if err != nil {
 			errorLogger("Error Obtaining Updates: " + err.Error())
-			return
 		}
 
 		defer resp.Body.Close()
@@ -170,13 +169,11 @@ func listenForUpdates(teleurl string, errorLogger func(string)) {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			errorLogger("Error Reading Body: " + err.Error())
-			return
 		}
 
 		err = json.Unmarshal([]byte(body), &updates)
 		if err != nil {
-			errorLogger("Error Parsing Telegram getUpdates Response: " + err.Error())
-			return
+			errorLogger("Error Parsing Telegram getUpdates Response: " + err.Error() + "; Response body: " + string(body))
 		}
 
 		// Dispatch incoming messages to appropriate functions
