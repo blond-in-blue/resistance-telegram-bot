@@ -178,11 +178,13 @@ func listenForUpdates(teleurl string, errorLogger func(string)) {
 
 		// Dispatch incoming messages to appropriate functions
 		for _, update := range updates.Result {
-			log.Println("Msg: " + update.Message.Text)
-			lastUpdate = update.UpdateID + 1
-			for _, command := range commands {
-				command(update)
+			if update.Message != nil {
+				log.Println("Msg: " + update.Message.Text)
+				for _, command := range commands {
+					command(update)
+				}
 			}
+			lastUpdate = update.UpdateID + 1
 		}
 
 	}
