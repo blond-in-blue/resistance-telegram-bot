@@ -1,10 +1,28 @@
 <html>
-	<h1>
-		Telegram Bot is Running
-	</h1>
 
-	<h2> Errors that have occurred </h2>
+<head>
+	<style>
+		html {
+			font-family: consolas;
+		}
+
+		.error {
+			margin: 8px;
+			padding: 8px;
+			background-color: rgba(0, 0, 0, 0.1);
+		}
+	</style>
+</head>
+
+<body>
+	<h1>Resistance Telegram Bot is Running</h1>
 	{{range .errors}}
-        <div>{{.}} </div>
-    {{end}}
+		<h2>Errors that have occurred  since last restart</h2>
+		<div class="error">{{.}} </div>
+	{{else}}
+		<h2>No Errors have occured since last restart ({{ .restarted }})</h2>
+	{{end}}
+
+</body>
+
 </html>

@@ -76,15 +76,12 @@ func rule34Search(term string, url string, update Update, errorLogger func(strin
 		submissions[i] = child.Data
 	}
 
-	log.Println("Succesful")
 	log.Println(submissions)
 
 	if len(submissions) > 0 {
-		log.Println("How's this? : " + submissions[0].URL)
-		// sendMessage("How's this? : "+submissions[0].URL, url, update)
+		sendMessage("How's this? : "+submissions[0].URL, url, update)
 	} else {
-		log.Println("Couldn't find any porn for: " + term)
-		// sendMessage("Couldn't find any porn for: "+term, url, update)
+		sendMessage("Couldn't find any porn for: "+term, url, update)
 	}
 }
 
@@ -135,16 +132,16 @@ func getCommands(url string, errorLogger func(string)) []func(Update) {
 }
 
 // Create our routes
-func initRoutes(router *gin.Engine, teleurl string, errors *[]string) {
+func initRoutes(router *gin.Engine, errors *[]string) {
 
 	router.LoadHTMLGlob("templates/*")
 
-	//errors := [...]string{"help", "me"}
+	timeStarted := getTime()
 
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
-			"title":  "Telegram Bot",
-			"errors": errors,
+			"restarted": timeStarted,
+			"errors":    errors,
 		})
 	})
 
@@ -156,11 +153,15 @@ func listenForUpdates(teleurl string, errorLogger func(string)) {
 	commands := getCommands(teleurl, errorLogger)
 
 	for {
+		// Sleep first, so if we error out and continue to the next loop, we still end up waiting
 		time.Sleep(time.Second)
 
 		resp, err := http.Get(teleurl + "getUpdates?offset=" + strconv.Itoa(lastUpdate))
-		if err != nil {
+
+		// Sometimes Telegram will just randomly send a 502
+		if err != nil || resp.StatusCode != 200 {
 			errorLogger("Error Obtaining Updates: " + err.Error())
+			continue
 		}
 
 		defer resp.Body.Close()
@@ -169,11 +170,13 @@ func listenForUpdates(teleurl string, errorLogger func(string)) {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			errorLogger("Error Reading Body: " + err.Error())
+			continue
 		}
 
 		err = json.Unmarshal([]byte(body), &updates)
 		if err != nil {
 			errorLogger("Error Parsing Telegram getUpdates Response: " + err.Error() + "; Response body: " + string(body))
+			continue
 		}
 
 		// Dispatch incoming messages to appropriate functions
@@ -190,6 +193,12 @@ func listenForUpdates(teleurl string, errorLogger func(string)) {
 	}
 }
 
+// Format the current time
+func getTime() string {
+	t := time.Now()
+	return t.Format("Mon Jan _2 15:04:05 UTC-01:00 2006")
+}
+
 func main() {
 
 	// Can't run a server without a port
@@ -203,10 +212,8 @@ func main() {
 
 	errorMessages := []string{}
 	var errorLogger = func(msg string) {
-		t := time.Now()
 		log.Println(msg)
-		newMsg := [...]string{t.Format("Mon Jan _2 15:04:05 2006") + ": " + msg}
-
+		newMsg := [...]string{getTime() + ": " + msg}
 		errorMessages = append(newMsg[:], errorMessages...)
 	}
 
@@ -223,7 +230,7 @@ func main() {
 	// Recover from errors and return 500
 	r.Use(gin.Recovery())
 
-	initRoutes(r, teleurl, &errorMessages)
+	initRoutes(r, &errorMessages)
 	r.Run(":" + port)
 
 }
