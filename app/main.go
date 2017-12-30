@@ -16,16 +16,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jzelinskie/geddit"
 )
-
-// RedditResponse A typical resonse when searching reddit
-type RedditResponse struct {
-	Data struct {
-		Children []struct {
-			Data *Submission
-		}
-	}
-}
 
 // Resposible for sending a message to the appropriate group chat
 func sendMessage(message string, url string, update Update) {
@@ -52,38 +44,38 @@ func sendMessage(message string, url string, update Update) {
 	log.Println(string(body))
 }
 
-func rule34Search(term string, url string, update Update, errorLogger func(string)) {
-	log.Println("searching rule 34: " + term)
-	searchURL := "https://www.reddit.com/r/rule34/search.json?q=" + term + "&restrict_sr=on&sort=relevance&t=all"
-	resp, err := http.Get(searchURL)
+// func rule34Search(term string, url string, update Update, errorLogger func(string)) {
+// 	log.Println("searching rule 34: " + term)
+// 	searchURL := "https://www.reddit.com/r/rule34/search.json?q=" + term + "&restrict_sr=on&sort=relevance&t=all"
+// 	resp, err := http.Get(searchURL)
 
-	if err != nil {
-		errorLogger("Error Searching Reddit: " + err.Error())
-	}
+// 	if err != nil {
+// 		errorLogger("Error Searching Reddit: " + err.Error())
+// 	}
 
-	defer resp.Body.Close()
+// 	defer resp.Body.Close()
 
-	r := RedditResponse{}
-	body, err := ioutil.ReadAll(resp.Body)
-	log.Printf(string(body))
-	json.Unmarshal([]byte(body), &r)
-	if err != nil {
-		errorLogger("Error Parsing Reddit Response: " + err.Error())
-	}
+// 	r := RedditResponse{}
+// 	body, err := ioutil.ReadAll(resp.Body)
+// 	log.Printf(string(body))
+// 	json.Unmarshal([]byte(body), &r)
+// 	if err != nil {
+// 		errorLogger("Error Parsing Reddit Response: " + err.Error())
+// 	}
 
-	submissions := make([]*Submission, len(r.Data.Children))
-	for i, child := range r.Data.Children {
-		submissions[i] = child.Data
-	}
+// 	submissions := make([]*Submission, len(r.Data.Children))
+// 	for i, child := range r.Data.Children {
+// 		submissions[i] = child.Data
+// 	}
 
-	log.Println(submissions)
+// 	log.Println(submissions)
 
-	if len(submissions) > 0 {
-		sendMessage("How's this? : "+submissions[0].URL, url, update)
-	} else {
-		sendMessage("Couldn't find any porn for: "+term, url, update)
-	}
-}
+// 	if len(submissions) > 0 {
+// 		sendMessage("How's this? : "+submissions[0].URL, url, update)
+// 	} else {
+// 		sendMessage("Couldn't find any porn for: "+term, url, update)
+// 	}
+// }
 
 // Builds and returns commands with url.
 func getCommands(url string, errorLogger func(string)) []func(Update) {
@@ -117,7 +109,7 @@ func getCommands(url string, errorLogger func(string)) []func(Update) {
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "rule34")
 			if len(commands) > 1 {
-				go rule34Search(strings.TrimSpace(commands[1]), url, update, errorLogger)
+				//go rule34Search(strings.TrimSpace(commands[1]), url, update, errorLogger)
 			}
 		},
 
@@ -139,6 +131,13 @@ func initRoutes(router *gin.Engine, errors *[]string) {
 	timeStarted := getTime()
 
 	router.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.tmpl", gin.H{
+			"restarted": timeStarted,
+			"errors":    errors,
+		})
+	})
+
+	router.GET("/sexy", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
 			"restarted": timeStarted,
 			"errors":    errors,
@@ -199,6 +198,40 @@ func getTime() string {
 	return t.Format("Mon Jan _2 15:04:05 UTC-01:00 2006")
 }
 
+func logginToReddit(errorLogger func(string)) *geddit.LoginSession {
+	// log.Printf("Logging in with: %s, %s\n", os.Getenv("REDDIT_USERNAME"), os.Getenv("REDDIT_PASSWORD"))
+	// session, err := geddit.NewOAuthSession(
+	// 	os.Getenv("REDDIT_CLIENT_ID"),
+	// 	os.Getenv("REDDIT_CLIENT_SECRET"),
+	// 	"Resistance Telegram Bot v1 OAuth",
+	// 	"http://localhost/sexy",
+	// )
+	// if err != nil {
+	// 	errorLogger("Error logging into reddit! " + err.Error())
+	// } else {
+	// 	log.Println(session)
+	// }
+
+	// err = session.LoginAuth(os.Getenv("REDDIT_USERNAME"), os.Getenv("REDDIT_PASSWORD"))
+	// if err != nil {
+	// 	errorLogger(err.Error())
+	// }
+
+	log.Printf("Logging in with: %s, %s\n", os.Getenv("REDDIT_USERNAME"), os.Getenv("REDDIT_PASSWORD"))
+	session, err := geddit.NewLoginSession(
+		os.Getenv("REDDIT_USERNAME"),
+		os.Getenv("REDDIT_PASSWORD"),
+		"Resistance Telegram Bot",
+	)
+	if err != nil {
+		errorLogger("Error logging into reddit! " + err.Error())
+	} else {
+		log.Println(session)
+	}
+
+	return session
+}
+
 func main() {
 
 	// Can't run a server without a port
@@ -231,6 +264,8 @@ func main() {
 	r.Use(gin.Recovery())
 
 	initRoutes(r, &errorMessages)
-	r.Run(":" + port)
+	go r.Run(":" + port)
 
+	time.Sleep(time.Second * 2)
+	logginToReddit(errorLogger)
 }
