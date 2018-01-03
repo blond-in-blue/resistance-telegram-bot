@@ -123,7 +123,7 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 
 		// God command
 		func(update Update) {
-			if strings.Contains(update.Message.Text, "gg") {
+			if update.Message.Text == "/gg" {
 				go sendMessage("GOD IS GREAT", url, update)
 			}
 		},
@@ -155,7 +155,15 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "murder")
 			if len(commands) > 1 {
-				log.Println()
+				text := strings.TrimSpace(commands[1])
+				// Don't put anything if they didn't give us anything
+				if text == "" {
+					return
+				}
+
+				if text == "me" {
+					text = update.Message.From.UserName
+				}
 				im, err := gg.LoadPNG("murder/test.png")
 				if err != nil {
 					errorLogger("unable to load image: " + err.Error())
@@ -172,7 +180,6 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 					Size: 70,
 				})
 				dc.SetFontFace(face)
-				text := strings.TrimSpace(commands[1])
 				dc.DrawStringAnchored(text, 500, 120, 0.0, 0.0)
 				dc.SavePNG("media/out.png")
 				sendImage(url, update, errorLogger)
