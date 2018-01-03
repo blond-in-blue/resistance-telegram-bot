@@ -6,13 +6,11 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -47,65 +45,8 @@ func sendMessage(message string, url string, update Update) {
 	log.Println(string(body))
 }
 
-func rule34Search(term string, url string, update Update, errorLogger func(string), redditSession *http.Cookie) {
-	log.Println("searching rule 34: " + term)
-
-	// Create a request to be sent to reddit
-	req, err := http.NewRequest("GET", "https://www.reddit.com/r/rule34/search.json?q="+term+"&restrict_sr=on&sort=relevance&t=all", nil)
-	if err != nil {
-		errorLogger("Error creating reddit request: " + err.Error())
-	}
-	req.Header.Set("User-Agent", "Resistance Telegram Bot")
-	req.AddCookie(redditSession)
-
-	// Actually query reddit
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		errorLogger("Error querying reddit: " + err.Error())
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		errorLogger("Error querying reddit: " + resp.Status)
-	}
-
-	respbytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		errorLogger("Error querying reddit: " + err.Error())
-	}
-
-	log.Println(string(respbytes))
-
-	body := bytes.NewBuffer(respbytes)
-
-	type Response struct {
-		Data struct {
-			Children []struct {
-				Data *Submission
-			}
-		}
-	}
-
-	r := new(Response)
-
-	err = json.NewDecoder(body).Decode(r)
-	if err != nil {
-		errorLogger(err.Error())
-	}
-
-	submissions := make([]*Submission, len(r.Data.Children))
-	for i, child := range r.Data.Children {
-		submissions[i] = child.Data
-	}
-
-	if len(submissions) > 0 {
-		sendMessage(submissions[0].URL, url, update)
-	}
-
-}
-
 // Builds and returns commands with url.
-func getCommands(url string, errorLogger func(string), redditSession *http.Cookie) []func(Update) {
+func getCommands(url string, errorLogger func(string), redditSession *http.Cookie, modhash string) []func(Update) {
 
 	return []func(update Update){
 
@@ -137,6 +78,14 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 			commands := strings.SplitAfter(update.Message.Text, "rule34")
 			if len(commands) > 1 {
 				go rule34Search(strings.TrimSpace(commands[1]), url, update, errorLogger, redditSession)
+			}
+		},
+
+		// Save command
+		func(update Update) {
+			commands := strings.SplitAfter(update.Message.Text, "save")
+			if len(commands) > 1 {
+				go SaveCommand(strings.TrimSpace(commands[1]), url, update, errorLogger, redditSession, modhash)
 			}
 		},
 
@@ -180,7 +129,8 @@ func initRoutes(router *gin.Engine, errors *[]string) {
 func listenForUpdates(teleurl string, errorLogger func(string)) {
 	var lastUpdate = -1
 
-	commands := getCommands(teleurl, errorLogger, logginToReddit(errorLogger))
+	cookie, modhash := logginToReddit(errorLogger)
+	commands := getCommands(teleurl, errorLogger, cookie, modhash)
 
 	for {
 		// Sleep first, so if we error out and continue to the next loop, we still end up waiting
@@ -229,74 +179,7 @@ func getTime() string {
 	return t.Format("Mon Jan _2 15:04:05 UTC-01:00 2006")
 }
 
-// MyLoginSession creates a new session for those who want to log into a
-func MyLoginSession(username, password, useragent string) (*http.Cookie, string, error) {
-
-	loginURL := fmt.Sprintf("https://www.reddit.com/api/login/%s", username)
-	postValues := url.Values{
-		"user":     {username},
-		"passwd":   {password},
-		"api_type": {"json"},
-	}
-
-	// Build our request
-	req, err := http.NewRequest("POST", loginURL, strings.NewReader(postValues.Encode()))
-	if err != nil {
-		return nil, "", err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", useragent)
-
-	http.DefaultClient.Timeout = time.Second * 10
-	log.Println(http.DefaultClient)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", err
-	}
-
-	// Get the session cookie.
-	var redditCookie *http.Cookie
-	for _, cookie := range resp.Cookies() {
-		if cookie.Name == "reddit_session" {
-			redditCookie = cookie
-		}
-	}
-
-	// Get the modhash from the JSON.
-	type Response struct {
-		JSON struct {
-			Errors [][]string
-			Data   struct {
-				Modhash string
-			}
-		}
-	}
-
-	r := &Response{}
-	err = json.NewDecoder(resp.Body).Decode(r)
-	if err != nil {
-		return redditCookie, "", err
-	}
-
-	if len(r.JSON.Errors) != 0 {
-		var msg []string
-		for _, k := range r.JSON.Errors {
-			msg = append(msg, k[1])
-		}
-		return redditCookie, "", errors.New(strings.Join(msg, ", "))
-	}
-	modhash := r.JSON.Data.Modhash
-
-	return redditCookie, modhash, nil
-}
-
-func logginToReddit(errorLogger func(string)) *http.Cookie {
+func logginToReddit(errorLogger func(string)) (*http.Cookie, string) {
 
 	log.Printf("Logging into: %s\n", os.Getenv("REDDIT_USERNAME"))
 	cookie, modhash, err := MyLoginSession(
@@ -307,10 +190,10 @@ func logginToReddit(errorLogger func(string)) *http.Cookie {
 	if err != nil {
 		errorLogger("Error logging into reddit! " + err.Error())
 	} else {
-		log.Println(fmt.Sprintf("Succesfully logged in %s", modhash))
+		log.Println(fmt.Sprintf("Succesfully logged in."))
 	}
 
-	return cookie
+	return cookie, modhash
 }
 
 func main() {
@@ -332,7 +215,6 @@ func main() {
 
 	teleurl := "https://api.telegram.org/bot" + os.Getenv("TELE_KEY") + "/"
 
-	log.Println("Get Ready....")
 	go listenForUpdates(teleurl, errorLogger)
 
 	// Create our engine
