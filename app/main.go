@@ -7,9 +7,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/png"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strconv"
@@ -18,7 +22,58 @@ import (
 
 	"github.com/fogleman/gg"
 	"github.com/gin-gonic/gin"
+	"github.com/golang/freetype/truetype"
+	"golang.org/x/image/font/gofont/goregular"
 )
+
+func sendImage(url string, update Update, errorLogger func(string)) {
+	var b bytes.Buffer
+	var err error
+	w := multipart.NewWriter(&b)
+	var fw io.Writer
+
+	w.WriteField("chat_id", strconv.FormatInt(update.Message.Chat.ID, 10))
+	file, err := os.Open("media/out.png")
+	if err != nil {
+		errorLogger(err.Error())
+	}
+
+	img, msg, err := image.Decode(file)
+	if err != nil {
+		errorLogger(err.Error())
+	}
+	log.Println(msg)
+
+	if fw, err = w.CreateFormFile("photo", "image.png"); err != nil {
+		errorLogger(err.Error())
+	}
+	if err = png.Encode(fw, img); err != nil {
+		errorLogger(err.Error())
+	}
+
+	w.CreateFormField("something")
+
+	w.Close()
+
+	req, err := http.NewRequest("POST", url+"sendPhoto", &b)
+	if err != nil {
+		errorLogger(err.Error())
+	}
+
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		errorLogger(err.Error())
+	}
+
+	bytes, err := ioutil.ReadAll(res.Body)
+
+	if err != nil {
+		errorLogger(err.Error())
+	}
+	log.Println(string(bytes))
+}
 
 // Resposible for sending a message to the appropriate group chat
 func sendMessage(message string, url string, update Update) {
@@ -100,11 +155,27 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "murder")
 			if len(commands) > 1 {
-				dc := gg.NewContext(1000, 1000)
-				dc.DrawCircle(500, 500, 400)
-				dc.SetRGB(0, 0, 0)
-				dc.Fill()
-				dc.SavePNG("out.png")
+				log.Println()
+				im, err := gg.LoadPNG("murder/test.png")
+				if err != nil {
+					errorLogger("unable to load image: " + err.Error())
+					return
+				}
+				dc := gg.NewContextForImage(im)
+
+				dc.SetRGB(1, 1, 1)
+				font, err := truetype.Parse(goregular.TTF)
+				if err != nil {
+					errorLogger(err.Error())
+				}
+				face := truetype.NewFace(font, &truetype.Options{
+					Size: 70,
+				})
+				dc.SetFontFace(face)
+				text := strings.TrimSpace(commands[1])
+				dc.DrawStringAnchored(text, 500, 120, 0.0, 0.0)
+				dc.SavePNG("media/out.png")
+				sendImage(url, update, errorLogger)
 			}
 		},
 	}
@@ -123,6 +194,8 @@ func initRoutes(router *gin.Engine, errors *[]string) {
 			"errors":    errors,
 		})
 	})
+
+	router.StaticFS("/media", http.Dir("media"))
 
 }
 
