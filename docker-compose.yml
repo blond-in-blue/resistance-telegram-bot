@@ -3,10 +3,13 @@ services:
     telebot:
         build:
             context: ./
+        env_file:
+            - ./my.env
         volumes:
             - ./app:/go/src/github.com/user/myProject/app
         ports:
-            - 80:3000
+            - 3000:3000
+            - 3001:3001
         container_name: telebot
         command: gin -i run main.go
 

@@ -1,7 +1,5 @@
 node_modules
-.env
+*.env
 
 app/gin-bin
 
-Dockerfile
-Dockerfile.debug

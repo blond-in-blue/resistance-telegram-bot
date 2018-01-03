@@ -4,19 +4,18 @@ Telegram bot built in go.
 
 A lot of code pulled from [here](https://github.com/go-telegram-bot-api/telegram-bot-api/blob/13c54dc548f7ca692fe434d4b7cac072b0de0e0b/types.go#L129).
 
-## Development
+## Development + Deployment
 
-To spin up a debug container with hot reloading, make a duplicate of the `sample.Dockerfile.debug` and name it simply `Dockerfile.debug`, adding in the apprioriate keys to the environment variable.
-
-
+To spin up a container with hot reloading, make your own file *my.env* and place it the root of this project. Put in it these variables:
 ```
-docker build --rm -t smartest-telegram-bot -f Dockerfile.debug .
-docker run -p 3000:3000 -v C:/dev/projects/StartNode/smartest-reddits/app:/go/src/github.com/user/myProject/app --name tele-bot smartest-telegram-bot 
+TELE_KEY=<key given from fatherbot>
+REDDIT_CLIENT_ID=<id of app generated on reddit>
+REDDIT_CLIENT_SECRET=<secret of the app>
+REDDIT_USERNAME=<your reddit username>
+REDDIT_PASSWORD=<your reddit password>
 ```
 
-## Production:
-
+To actually run the app:
 ```
-docker build --rm -t smartest-telegram-bot-prod .
-docker run -p 80:80 --name tele-bot-prod smartest-telegram-bot-prod 
+docker-compose up
 ```
