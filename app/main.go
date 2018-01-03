@@ -76,36 +76,32 @@ func rule34Search(term string, url string, update Update, errorLogger func(strin
 
 	log.Println(string(respbytes))
 
-	//return bytes.NewBuffer(respbytes), nil
+	body := bytes.NewBuffer(respbytes)
 
-	// resp, err := http.Get(searchURL)
+	type Response struct {
+		Data struct {
+			Children []struct {
+				Data *Submission
+			}
+		}
+	}
 
-	// if err != nil {
-	// 	errorLogger("Error Searching Reddit: " + err.Error())
-	// }
+	r := new(Response)
 
-	// defer resp.Body.Close()
+	err = json.NewDecoder(body).Decode(r)
+	if err != nil {
+		errorLogger(err.Error())
+	}
 
-	// r := RedditResponse{}
-	// body, err := ioutil.ReadAll(resp.Body)
-	// log.Printf(string(body))
-	// json.Unmarshal([]byte(body), &r)
-	// if err != nil {
-	// 	errorLogger("Error Parsing Reddit Response: " + err.Error())
-	// }
+	submissions := make([]*Submission, len(r.Data.Children))
+	for i, child := range r.Data.Children {
+		submissions[i] = child.Data
+	}
 
-	// submissions := make([]*Submission, len(r.Data.Children))
-	// for i, child := range r.Data.Children {
-	// 	submissions[i] = child.Data
-	// }
+	if len(submissions) > 0 {
+		sendMessage(submissions[0].URL, url, update)
+	}
 
-	// log.Println(submissions)
-
-	// if len(submissions) > 0 {
-	// 	sendMessage("How's this? : "+submissions[0].URL, url, update)
-	// } else {
-	// 	sendMessage("Couldn't find any porn for: "+term, url, update)
-	// }
 }
 
 // Builds and returns commands with url.
@@ -168,7 +164,6 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 // Create our routes
 func initRoutes(router *gin.Engine, errors *[]string) {
 
-	//router.LoadHTMLGlob("templates/*")
 	router.LoadHTMLFiles("templates/index.tmpl")
 
 	timeStarted := getTime()
@@ -180,16 +175,12 @@ func initRoutes(router *gin.Engine, errors *[]string) {
 		})
 	})
 
-	router.GET("/help", func(c *gin.Context) {
-		c.String(200, "help")
-	})
-
 }
 
 func listenForUpdates(teleurl string, errorLogger func(string)) {
 	var lastUpdate = -1
 
-	commands := getCommands(teleurl, errorLogger, nil)
+	commands := getCommands(teleurl, errorLogger, logginToReddit(errorLogger))
 
 	for {
 		// Sleep first, so if we error out and continue to the next loop, we still end up waiting
@@ -256,7 +247,7 @@ func MyLoginSession(username, password, useragent string) (*http.Cookie, string,
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", useragent)
 
-	http.DefaultClient.Timeout = time.Second
+	http.DefaultClient.Timeout = time.Second * 10
 	log.Println(http.DefaultClient)
 
 	resp, err := http.DefaultClient.Do(req)
@@ -330,8 +321,7 @@ func main() {
 		log.Fatal("PORT environment variable was not set")
 		return
 	}
-
-	log.Println("Starting bot!")
+	log.Printf("Starting bot using port %s\n", port)
 
 	errorMessages := []string{}
 	var errorLogger = func(msg string) {
@@ -342,6 +332,7 @@ func main() {
 
 	teleurl := "https://api.telegram.org/bot" + os.Getenv("TELE_KEY") + "/"
 
+	log.Println("Get Ready....")
 	go listenForUpdates(teleurl, errorLogger)
 
 	// Create our engine
@@ -354,6 +345,6 @@ func main() {
 	r.Use(gin.Recovery())
 
 	initRoutes(r, &errorMessages)
-	go r.Run(":" + port)
+	r.Run(":" + port)
 
 }
