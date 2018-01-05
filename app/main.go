@@ -105,9 +105,17 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 
 	return []func(update Update){
 
+		// Eli is a furry command
+		func(update Update) {
+			if strings.Contains(strings.ToLower(update.Message.Text), "eli") &&  strings.Contains(strings.ToLower(update.Message.Text), "furry"){
+				go sendMessage("Actually, "+update.Message.From.UserName + " is the furry", url, update)
+			}
+
+		},
+
 		// Kill command
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "kill")
+			commands := strings.SplitAfter(update.Message.Text, "/kill")
 			if len(commands) > 1 {
 				n := rand.Int() % len(killStatements)
 				go sendMessage(strings.TrimSpace(commands[1])+killStatements[n], url, update)
@@ -116,7 +124,7 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 
 		// Traps command
 		func(update Update) {
-			if strings.Contains(update.Message.Text, "traps") {
+			if strings.Contains(update.Message.Text, "/traps") {
 				go sendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", url, update)
 			}
 		},
@@ -130,7 +138,7 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 
 		// Rule34 command
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "rule34")
+			commands := strings.SplitAfter(update.Message.Text, "/rule34")
 			if len(commands) > 1 {
 				go rule34Search(strings.TrimSpace(commands[1]), url, update, errorLogger, redditSession)
 			}
@@ -138,7 +146,7 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 
 		// Save command
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "save")
+			commands := strings.SplitAfter(update.Message.Text, "/save")
 			if len(commands) > 1 {
 				go SaveCommand(strings.TrimSpace(commands[1]), url, update, errorLogger, redditSession, modhash)
 			}
@@ -146,14 +154,14 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 
 		//pokedexSerach
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "pokedex")
+			commands := strings.SplitAfter(update.Message.Text, "/pokedex")
 			if len(commands) > 1 {
 				go pokedexSerach(strings.TrimSpace(commands[1]), url, update, errorLogger)
 			}
 		},
 
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "murder")
+			commands := strings.SplitAfter(update.Message.Text, "/murder")
 			if len(commands) > 1 {
 				text := strings.TrimSpace(commands[1])
 				// Don't put anything if they didn't give us anything
