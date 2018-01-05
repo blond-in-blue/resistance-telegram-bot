@@ -4,19 +4,11 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"image"
-	"image/png"
-	"io"
-	"io/ioutil"
 	"log"
 	"math/rand"
-	"mime/multipart"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -26,89 +18,15 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 )
 
-func sendImage(url string, update Update, errorLogger func(string)) {
-	var b bytes.Buffer
-	var err error
-	w := multipart.NewWriter(&b)
-	var fw io.Writer
-
-	w.WriteField("chat_id", strconv.FormatInt(update.Message.Chat.ID, 10))
-	file, err := os.Open("media/out.png")
-	if err != nil {
-		errorLogger(err.Error())
-	}
-
-	img, msg, err := image.Decode(file)
-	if err != nil {
-		errorLogger(err.Error())
-	}
-	log.Println(msg)
-
-	if fw, err = w.CreateFormFile("photo", "image.png"); err != nil {
-		errorLogger(err.Error())
-	}
-	if err = png.Encode(fw, img); err != nil {
-		errorLogger(err.Error())
-	}
-
-	w.CreateFormField("something")
-
-	w.Close()
-
-	req, err := http.NewRequest("POST", url+"sendPhoto", &b)
-	if err != nil {
-		errorLogger(err.Error())
-	}
-
-	req.Header.Set("Content-Type", w.FormDataContentType())
-	client := &http.Client{}
-	res, err := client.Do(req)
-	if err != nil {
-		errorLogger(err.Error())
-	}
-
-	bytes, err := ioutil.ReadAll(res.Body)
-
-	if err != nil {
-		errorLogger(err.Error())
-	}
-	log.Println(string(bytes))
-}
-
-// Resposible for sending a message to the appropriate group chat
-func sendMessage(message string, url string, update Update) {
-
-	// Send Message to telegram's api
-	resp, err := http.Post(url+"sendMessage", "application/json", bytes.NewBuffer([]byte(`{
-		"chat_id": `+strconv.FormatInt(update.Message.Chat.ID, 10)+`,
-		"text": "`+message+`",
-		"parse_mode": "HTML"
-	}`)))
-
-	// Catch errors
-	if err != nil {
-		log.Println("Error sending message:")
-		log.Println(err)
-		return
-	}
-
-	defer resp.Body.Close()
-
-	// Read and print message
-	body, err := ioutil.ReadAll(resp.Body)
-	log.Println("\nTelegram Said: ")
-	log.Println(string(body))
-}
-
 // Builds and returns commands with url.
-func getCommands(url string, errorLogger func(string), redditSession *http.Cookie, modhash string) []func(Update) {
+func getCommands(telebot Telegram, errorLogger func(string), redditSession *http.Cookie, modhash string) []func(Update) {
 
 	return []func(update Update){
 
 		// Eli is a furry command
 		func(update Update) {
-			if strings.Contains(strings.ToLower(update.Message.Text), "eli") &&  strings.Contains(strings.ToLower(update.Message.Text), "furry"){
-				go sendMessage("Actually, "+update.Message.From.UserName + " is the furry", url, update)
+			if strings.Contains(strings.ToLower(update.Message.Text), "eli") && strings.Contains(strings.ToLower(update.Message.Text), "furry") {
+				go telebot.SendMessage("Actually, "+update.Message.From.UserName+" is the furry", update.Message.Chat.ID)
 			}
 
 		},
@@ -118,21 +36,21 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 			commands := strings.SplitAfter(update.Message.Text, "/kill")
 			if len(commands) > 1 {
 				n := rand.Int() % len(killStatements)
-				go sendMessage(strings.TrimSpace(commands[1])+killStatements[n], url, update)
+				go telebot.SendMessage(strings.TrimSpace(commands[1])+killStatements[n], update.Message.Chat.ID)
 			}
 		},
 
 		// Traps command
 		func(update Update) {
 			if strings.Contains(update.Message.Text, "/traps") {
-				go sendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", url, update)
+				go telebot.SendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", update.Message.Chat.ID)
 			}
 		},
 
 		// God command
 		func(update Update) {
 			if update.Message.Text == "/gg" {
-				go sendMessage("GOD IS GREAT", url, update)
+				go telebot.SendMessage("GOD IS GREAT", update.Message.Chat.ID)
 			}
 		},
 
@@ -140,7 +58,7 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "/rule34")
 			if len(commands) > 1 {
-				go rule34Search(strings.TrimSpace(commands[1]), url, update, errorLogger, redditSession)
+				go rule34Search(strings.TrimSpace(commands[1]), telebot, update, errorLogger, redditSession)
 			}
 		},
 
@@ -148,7 +66,7 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "/save")
 			if len(commands) > 1 {
-				go SaveCommand(strings.TrimSpace(commands[1]), url, update, errorLogger, redditSession, modhash)
+				go SaveCommand(strings.TrimSpace(commands[1]), telebot, update, errorLogger, redditSession, modhash)
 			}
 		},
 
@@ -156,7 +74,7 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "/pokedex")
 			if len(commands) > 1 {
-				go pokedexSerach(strings.TrimSpace(commands[1]), url, update, errorLogger)
+				go pokedexSerach(strings.TrimSpace(commands[1]), telebot, update, errorLogger)
 			}
 		},
 
@@ -190,7 +108,7 @@ func getCommands(url string, errorLogger func(string), redditSession *http.Cooki
 				dc.SetFontFace(face)
 				dc.DrawStringAnchored(text, 500, 120, 0.0, 0.0)
 				dc.SavePNG("media/out.png")
-				sendImage(url, update, errorLogger)
+				telebot.sendImage(update.Message.Chat.ID)
 			}
 		},
 	}
@@ -214,48 +132,30 @@ func initRoutes(router *gin.Engine, errors *[]string) {
 
 }
 
-func listenForUpdates(teleurl string, errorLogger func(string)) {
-	var lastUpdate = -1
+func listenForUpdates(telebot Telegram, errorLogger func(string)) {
 
 	cookie, modhash := logginToReddit(errorLogger)
-	commands := getCommands(teleurl, errorLogger, cookie, modhash)
+	commands := getCommands(telebot, errorLogger, cookie, modhash)
 
 	for {
 		// Sleep first, so if we error out and continue to the next loop, we still end up waiting
 		time.Sleep(time.Second)
 
-		resp, err := http.Get(teleurl + "getUpdates?offset=" + strconv.Itoa(lastUpdate))
+		updates, err := telebot.GetUpdates()
 
-		// Sometimes Telegram will just randomly send a 502
-		if err != nil || resp.StatusCode != 200 {
-			errorLogger("Error Obtaining Updates: " + err.Error())
-			continue
-		}
-
-		defer resp.Body.Close()
-
-		var updates BatchUpdates
-		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			errorLogger("Error Reading Body: " + err.Error())
-			continue
-		}
-
-		err = json.Unmarshal([]byte(body), &updates)
-		if err != nil {
-			errorLogger("Error Parsing Telegram getUpdates Response: " + err.Error() + "; Response body: " + string(body))
+			errorLogger("Error getting updates from telegram: " + err.Error())
 			continue
 		}
 
 		// Dispatch incoming messages to appropriate functions
-		for _, update := range updates.Result {
+		for _, update := range updates {
 			if update.Message != nil {
 				log.Println("Msg: " + update.Message.Text)
 				for _, command := range commands {
 					command(update)
 				}
 			}
-			lastUpdate = update.UpdateID + 1
 		}
 
 	}
@@ -301,9 +201,13 @@ func main() {
 		errorMessages = append(newMsg[:], errorMessages...)
 	}
 
-	teleurl := "https://api.telegram.org/bot" + os.Getenv("TELE_KEY") + "/"
+	teleBot := Telegram{
+		key:         os.Getenv("TELE_KEY"),
+		errorLogger: errorLogger,
+		lastUpdate:  0,
+	}
 
-	go listenForUpdates(teleurl, errorLogger)
+	go listenForUpdates(teleBot, errorLogger)
 
 	// Create our engine
 	r := gin.New()

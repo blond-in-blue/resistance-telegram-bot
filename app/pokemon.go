@@ -71,7 +71,7 @@ func min(a, b int) int {
 	return b
 }
 
-func pokedexSerach(term string, url string, update Update, errorLogger func(string)) {
+func pokedexSerach(term string, telebot Telegram, update Update, errorLogger func(string)) {
 
 	log.Println("searching pokedex: " + term)
 	searchURL := "https://pokeapi.co/api/v2/pokemon/" + strings.ToLower(term)
@@ -79,7 +79,7 @@ func pokedexSerach(term string, url string, update Update, errorLogger func(stri
 
 	if err != nil {
 		errorLogger("Error Searching Pokedex: " + err.Error())
-		sendMessage("Error Searching Pokedex", url, update)
+		telebot.SendMessage("Error Searching Pokedex", update.Message.Chat.ID)
 		return
 	}
 
@@ -90,12 +90,12 @@ func pokedexSerach(term string, url string, update Update, errorLogger func(stri
 	json.Unmarshal([]byte(body), &r)
 	if err != nil {
 		errorLogger("Error Parsing Pokedex Response: " + err.Error())
-		sendMessage("Error Reading Response From Pokedex", url, update)
+		telebot.SendMessage("Error Reading Response From Pokedex", update.Message.Chat.ID)
 		return
 	}
 
 	if r.Detail == "Not found." {
-		sendMessage(term+" was not found in the Pokedex", url, update)
+		telebot.SendMessage(term+" was not found in the Pokedex", update.Message.Chat.ID)
 		return
 	}
 
@@ -144,5 +144,5 @@ func pokedexSerach(term string, url string, update Update, errorLogger func(stri
 
 	returnMessage += "</i>\n\n" + r.Sprites.FrontDefault
 
-	sendMessage(returnMessage, url, update)
+	telebot.SendMessage(returnMessage, update.Message.Chat.ID)
 }

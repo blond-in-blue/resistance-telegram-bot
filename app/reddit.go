@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func rule34Search(term string, url string, update Update, errorLogger func(string), redditSession *http.Cookie) {
+func rule34Search(term string, telebot Telegram, update Update, errorLogger func(string), redditSession *http.Cookie) {
 	log.Println("searching rule 34: " + term)
 
 	// Create a request to be sent to reddit
@@ -63,20 +63,20 @@ func rule34Search(term string, url string, update Update, errorLogger func(strin
 	}
 
 	if len(submissions) > 0 {
-		sendMessage(submissions[0].URL, url, update)
+		telebot.SendMessage(submissions[0].URL, update.Message.Chat.ID)
 	}
 
 }
 
-func SaveCommand(term string, teleurl string, update Update, errorLogger func(string), redditSession *http.Cookie, modhash string) {
+func SaveCommand(term string, telebot Telegram, update Update, errorLogger func(string), redditSession *http.Cookie, modhash string) {
 
 	if update.Message.ReplyToMessage == nil {
-		sendMessage("Reply to a message and say save to save to the subreddit", teleurl, update)
+		telebot.SendMessage("Reply to a message and say save to save to the subreddit", update.Message.Chat.ID)
 		return
 	}
 
 	if update.Message.ReplyToMessage.Text == "" {
-		sendMessage("I can only save text, give me some text or open up a feature branch", teleurl, update)
+		telebot.SendMessage("I can only save text, give me some text or open up a feature branch", update.Message.Chat.ID)
 		return
 	}
 
@@ -98,7 +98,7 @@ func SaveCommand(term string, teleurl string, update Update, errorLogger func(st
 	req, err := http.NewRequest("POST", "https://www.reddit.com/api/submit?"+vals.Encode(), nil)
 	if err != nil {
 		errorLogger("Error creating reddit request: " + err.Error())
-		sendMessage("Error: "+err.Error(), teleurl, update)
+		telebot.SendMessage("Error: "+err.Error(), update.Message.Chat.ID)
 	}
 	req.Header.Set("User-Agent", "Resistance Telegram Bot")
 	req.AddCookie(redditSession)
@@ -107,7 +107,7 @@ func SaveCommand(term string, teleurl string, update Update, errorLogger func(st
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		errorLogger("Error querying reddit: " + err.Error())
-		sendMessage("Error: "+err.Error(), teleurl, update)
+		telebot.SendMessage("Error: "+err.Error(), update.Message.Chat.ID)
 
 	}
 	defer resp.Body.Close()
@@ -115,15 +115,15 @@ func SaveCommand(term string, teleurl string, update Update, errorLogger func(st
 	respbytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		errorLogger("Error reading body: " + err.Error())
-		sendMessage("Error: "+err.Error(), teleurl, update)
+		telebot.SendMessage("Error: "+err.Error(), update.Message.Chat.ID)
 	}
 
 	// body := bytes.NewBuffer(respbytes)
 	if strings.Contains(string(respbytes), "error") {
 		errorLogger("failed to submit")
-		sendMessage("failed to submit", teleurl, update)
+		telebot.SendMessage("failed to submit", update.Message.Chat.ID)
 	} else {
-		sendMessage("I think it worked "+string(respbytes), teleurl, update)
+		telebot.SendMessage("I think it worked "+string(respbytes), update.Message.Chat.ID)
 	}
 	// log.Println(body)
 }
