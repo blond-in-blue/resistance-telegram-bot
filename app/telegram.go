@@ -79,23 +79,22 @@ func (telebot *Telegram) GetUpdates() ([]Update, error) {
 	return updates.Result, nil
 }
 
-func (telebot Telegram) sendImage(chatID int64) {
+func (telebot Telegram) sendImage(path string, chatID int64) {
 	var b bytes.Buffer
 	var err error
 	w := multipart.NewWriter(&b)
 	var fw io.Writer
 
 	w.WriteField("chat_id", strconv.FormatInt(chatID, 10))
-	file, err := os.Open("media/out.png")
+	file, err := os.Open(path)
 	if err != nil {
 		telebot.errorLogger(err.Error())
 	}
 
-	img, msg, err := image.Decode(file)
+	img, _, err := image.Decode(file)
 	if err != nil {
 		telebot.errorLogger(err.Error())
 	}
-	log.Println(msg)
 
 	if fw, err = w.CreateFormFile("photo", "image.png"); err != nil {
 		telebot.errorLogger(err.Error())

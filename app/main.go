@@ -25,7 +25,8 @@ func getCommands(telebot Telegram, errorLogger func(string), redditSession *http
 
 		// Eli is a furry command
 		func(update Update) {
-			if strings.Contains(strings.ToLower(update.Message.Text), "eli") && strings.Contains(strings.ToLower(update.Message.Text), "furry") {
+			msg := strings.ToLower(update.Message.Text)
+			if (strings.Contains(msg, "eli") || strings.Contains(msg, "b02s2")) && strings.Contains(msg, "furry") {
 				go telebot.SendMessage("Actually, "+update.Message.From.UserName+" is the furry", update.Message.Chat.ID)
 			}
 
@@ -108,7 +109,7 @@ func getCommands(telebot Telegram, errorLogger func(string), redditSession *http
 				dc.SetFontFace(face)
 				dc.DrawStringAnchored(text, 500, 120, 0.0, 0.0)
 				dc.SavePNG("media/out.png")
-				telebot.sendImage(update.Message.Chat.ID)
+				telebot.sendImage("media/out.png", update.Message.Chat.ID)
 			}
 		},
 	}

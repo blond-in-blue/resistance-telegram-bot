@@ -118,14 +118,14 @@ func SaveCommand(term string, telebot Telegram, update Update, errorLogger func(
 		telebot.SendMessage("Error: "+err.Error(), update.Message.Chat.ID)
 	}
 
-	// body := bytes.NewBuffer(respbytes)
+	body := bytes.NewBuffer(respbytes)
 	if strings.Contains(string(respbytes), "error") {
 		errorLogger("failed to submit")
 		telebot.SendMessage("failed to submit", update.Message.Chat.ID)
 	} else {
-		telebot.SendMessage("I think it worked "+string(respbytes), update.Message.Chat.ID)
+		telebot.SendMessage("I think it worked ", update.Message.Chat.ID)
 	}
-	// log.Println(body)
+	log.Println(body)
 }
 
 // MyLoginSession creates a new session for those who want to log into a
