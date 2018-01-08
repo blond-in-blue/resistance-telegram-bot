@@ -63,6 +63,14 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 			}
 		},
 
+		// Hedgehog
+		func(update Update) {
+			commands := strings.SplitAfter(update.Message.Text, "/hedgehog")
+			if len(commands) > 1 {
+				go hedgeHogCommand(strings.TrimSpace(commands[1]), telebot, update, errorLogger, redditSession)
+			}
+		},
+
 		// Save command
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "/save")

@@ -84,7 +84,6 @@ func LoginToReddit(username, password, useragent string) (RedditAccount, error) 
 }
 
 func rule34Search(term string, telebot Telegram, update Update, errorLogger func(string), redditSession RedditAccount) {
-	log.Println("searching rule 34: " + term)
 
 	submissions, err := redditSession.SearchSubreddit("rule34", term)
 
@@ -97,7 +96,25 @@ func rule34Search(term string, telebot Telegram, update Update, errorLogger func
 	if len(submissions) > 0 {
 		telebot.SendMessage(submissions[0].Title+"\n"+submissions[0].URL, update.Message.Chat.ID)
 	} else {
-		telebot.SendMessage("Didn't find anything", update.Message.Chat.ID)
+		telebot.SendMessage(fmt.Sprintf("Didn't find anything for '%s'", term), update.Message.Chat.ID)
+	}
+
+}
+
+func hedgeHogCommand(term string, telebot Telegram, update Update, errorLogger func(string), redditSession RedditAccount) {
+
+	submissions, err := redditSession.SearchSubreddit("thehedgehog", term)
+
+	if err != nil {
+		errorLogger("Error searching subreddit: " + err.Error())
+		telebot.SendMessage("Error searching", update.Message.Chat.ID)
+		return
+	}
+
+	if len(submissions) > 0 {
+		telebot.SendMessage(submissions[0].URL, update.Message.Chat.ID)
+	} else {
+		telebot.SendMessage(fmt.Sprintf("'%s' has not been hedgehogged ", term), update.Message.Chat.ID)
 	}
 
 }
@@ -170,8 +187,8 @@ func (r RedditAccount) PostToSubreddit(textPost string, title string, subreddit 
 }
 
 func (reddit RedditAccount) SearchSubreddit(subreddit string, term string) ([]*Submission, error) {
-	req, err := http.NewRequest("GET", "https://www.reddit.com/r/"+subreddit+"/search.json?q="+strings.Replace(term, " ", "+", -1)+"&restrict_sr=on&sort=relevance&t=all", nil)
-	log.Println(req.URL.String())
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://www.reddit.com/r/%s/search.json?q=%s&restrict_sr=on&sort=relevance&t=all", subreddit, strings.Replace(term, " ", "+", -1)), nil)
 	if err != nil {
 		return nil, err
 	}
