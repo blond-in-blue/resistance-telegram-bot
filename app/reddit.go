@@ -134,7 +134,7 @@ func SaveCommand(term string, telebot Telegram, update Update, errorLogger func(
 	//log.Println("Going to save... " + term)
 	log.Printf("update: %s", update.Message.ReplyToMessage.Text)
 
-	info, err := redditSession.PostToSubreddit(update.Message.ReplyToMessage.Text, term, "smartestretards")
+	info, err := redditSession.PostToSubreddit(fmt.Sprintf("%s:\n\n%s", update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.Text), term, "smartestretards")
 	if err != nil {
 		errorLogger("Unable to post to reddit: " + err.Error())
 		telebot.SendMessage("Unable to post to reddit", update.Message.Chat.ID)
