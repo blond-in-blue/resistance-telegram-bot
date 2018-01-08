@@ -13,124 +13,12 @@ import (
 	"time"
 )
 
-func rule34Search(term string, telebot Telegram, update Update, errorLogger func(string), redditSession *http.Cookie) {
-	log.Println("searching rule 34: " + term)
-
-	// Create a request to be sent to reddit
-	req, err := http.NewRequest("GET", "https://www.reddit.com/r/rule34/search.json?q="+term+"&restrict_sr=on&sort=relevance&t=all", nil)
-	if err != nil {
-		errorLogger("Error creating reddit request: " + err.Error())
-	}
-	req.Header.Set("User-Agent", "Resistance Telegram Bot")
-	req.AddCookie(redditSession)
-
-	// Actually query reddit
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		errorLogger("Error querying reddit: " + err.Error())
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		errorLogger("Error querying reddit: " + resp.Status)
-	}
-
-	respbytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		errorLogger("Error querying reddit: " + err.Error())
-	}
-
-	body := bytes.NewBuffer(respbytes)
-
-	type Response struct {
-		Data struct {
-			Children []struct {
-				Data *Submission
-			}
-		}
-	}
-
-	r := new(Response)
-
-	err = json.NewDecoder(body).Decode(r)
-	if err != nil {
-		errorLogger(err.Error())
-	}
-
-	submissions := make([]*Submission, len(r.Data.Children))
-	for i, child := range r.Data.Children {
-		submissions[i] = child.Data
-	}
-
-	if len(submissions) > 0 {
-		telebot.SendMessage(submissions[0].URL, update.Message.Chat.ID)
-	}
-
+type RedditAccount struct {
+	cookie  *http.Cookie
+	modhash string
 }
 
-func SaveCommand(term string, telebot Telegram, update Update, errorLogger func(string), redditSession *http.Cookie, modhash string) {
-
-	if update.Message.ReplyToMessage == nil {
-		telebot.SendMessage("Reply to a message and say save to save to the subreddit", update.Message.Chat.ID)
-		return
-	}
-
-	if update.Message.ReplyToMessage.Text == "" {
-		telebot.SendMessage("I can only save text, give me some text or open up a feature branch", update.Message.Chat.ID)
-		return
-	}
-
-	log.Println("Going to save... " + term)
-	log.Printf("update: %s", update.Message.ReplyToMessage.Text)
-
-	// Create a request to be sent to reddit
-	vals := &url.Values{
-		"title":       {term},
-		"url":         {update.Message.ReplyToMessage.Text},
-		"text":        {update.Message.ReplyToMessage.Text},
-		"sr":          {"smartestretards"},
-		"kind":        {"self"},
-		"sendreplies": {"true"},
-		"resubmit":    {"true"},
-		"extension":   {"json"},
-		"uh":          {modhash},
-	}
-	req, err := http.NewRequest("POST", "https://www.reddit.com/api/submit?"+vals.Encode(), nil)
-	if err != nil {
-		errorLogger("Error creating reddit request: " + err.Error())
-		telebot.SendMessage("Error: "+err.Error(), update.Message.Chat.ID)
-	}
-	req.Header.Set("User-Agent", "Resistance Telegram Bot")
-	req.AddCookie(redditSession)
-
-	// Actually query reddit
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		errorLogger("Error querying reddit: " + err.Error())
-		telebot.SendMessage("Error: "+err.Error(), update.Message.Chat.ID)
-
-	}
-	defer resp.Body.Close()
-
-	respbytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		errorLogger("Error reading body: " + err.Error())
-		telebot.SendMessage("Error: "+err.Error(), update.Message.Chat.ID)
-	}
-
-	body := bytes.NewBuffer(respbytes)
-	if strings.Contains(string(respbytes), "error") {
-		errorLogger("failed to submit")
-		telebot.SendMessage("failed to submit", update.Message.Chat.ID)
-	} else {
-		telebot.SendMessage("I think it worked ", update.Message.Chat.ID)
-	}
-	log.Println(body)
-}
-
-// MyLoginSession creates a new session for those who want to log into a
-func MyLoginSession(username, password, useragent string) (*http.Cookie, string, error) {
-
+func LoginToReddit(username, password, useragent string) (RedditAccount, error) {
 	loginURL := fmt.Sprintf("https://www.reddit.com/api/login/%s", username)
 	postValues := url.Values{
 		"user":     {username},
@@ -141,7 +29,7 @@ func MyLoginSession(username, password, useragent string) (*http.Cookie, string,
 	// Build our request
 	req, err := http.NewRequest("POST", loginURL, strings.NewReader(postValues.Encode()))
 	if err != nil {
-		return nil, "", err
+		return RedditAccount{}, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", useragent)
@@ -151,12 +39,12 @@ func MyLoginSession(username, password, useragent string) (*http.Cookie, string,
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, "", err
+		return RedditAccount{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, "", err
+		return RedditAccount{}, err
 	}
 
 	// Get the session cookie.
@@ -180,7 +68,7 @@ func MyLoginSession(username, password, useragent string) (*http.Cookie, string,
 	r := &Response{}
 	err = json.NewDecoder(resp.Body).Decode(r)
 	if err != nil {
-		return redditCookie, "", err
+		return RedditAccount{}, err
 	}
 
 	if len(r.JSON.Errors) != 0 {
@@ -188,9 +76,144 @@ func MyLoginSession(username, password, useragent string) (*http.Cookie, string,
 		for _, k := range r.JSON.Errors {
 			msg = append(msg, k[1])
 		}
-		return redditCookie, "", errors.New(strings.Join(msg, ", "))
+		return RedditAccount{}, errors.New(strings.Join(msg, ", "))
 	}
 	modhash := r.JSON.Data.Modhash
 
-	return redditCookie, modhash, nil
+	return RedditAccount{redditCookie, modhash}, nil
+}
+
+func rule34Search(term string, telebot Telegram, update Update, errorLogger func(string), redditSession RedditAccount) {
+	log.Println("searching rule 34: " + term)
+
+	submissions, err := redditSession.SearchSubreddit("rule34", term)
+
+	if err != nil {
+		errorLogger("Error searching subreddit: " + err.Error())
+		telebot.SendMessage("Error searching subreddit", update.Message.Chat.ID)
+		return
+	}
+
+	if len(submissions) > 0 {
+		telebot.SendMessage(submissions[0].Title+"\n"+submissions[0].URL, update.Message.Chat.ID)
+	} else {
+		telebot.SendMessage("Didn't find anything", update.Message.Chat.ID)
+	}
+
+}
+
+func SaveCommand(term string, telebot Telegram, update Update, errorLogger func(string), redditSession RedditAccount) {
+
+	if update.Message.ReplyToMessage == nil {
+		telebot.SendMessage("Reply to a message and say save to save to the subreddit", update.Message.Chat.ID)
+		return
+	}
+
+	if update.Message.ReplyToMessage.Text == "" {
+		telebot.SendMessage("I can only save text, give me some text or open up a feature branch", update.Message.Chat.ID)
+		return
+	}
+
+	//log.Println("Going to save... " + term)
+	log.Printf("update: %s", update.Message.ReplyToMessage.Text)
+
+	info, err := redditSession.PostToSubreddit(update.Message.ReplyToMessage.Text, term, "smartestretards")
+	if err != nil {
+		errorLogger("Unable to post to reddit: " + err.Error())
+		telebot.SendMessage("Unable to post to reddit", update.Message.Chat.ID)
+	} else {
+		telebot.SendMessage(info, update.Message.Chat.ID)
+	}
+}
+
+func (r RedditAccount) PostToSubreddit(textPost string, title string, subreddit string) (string, error) {
+	// Create a request to be sent to reddit
+	vals := &url.Values{
+		"title":       {title},
+		"url":         {textPost},
+		"text":        {textPost},
+		"sr":          {subreddit},
+		"kind":        {"self"},
+		"sendreplies": {"true"},
+		"resubmit":    {"true"},
+		"extension":   {"json"},
+		"uh":          {r.modhash},
+	}
+	req, err := http.NewRequest("POST", "https://www.reddit.com/api/submit?"+vals.Encode(), nil)
+	if err != nil {
+		//errorLogger("Error creating reddit request: " + err.Error())
+		//telebot.SendMessage("Error: "+err.Error(), update.Message.Chat.ID)
+		return "", err
+	}
+	req.Header.Set("User-Agent", "Resistance Telegram Bot")
+	req.AddCookie(r.cookie)
+
+	// Actually query reddit
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	respbytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	body := bytes.NewBuffer(respbytes)
+	log.Println(body)
+	if strings.Contains(string(respbytes), "error") {
+		return "", err
+	} else {
+		return "Success", nil
+	}
+}
+
+func (reddit RedditAccount) SearchSubreddit(subreddit string, term string) ([]*Submission, error) {
+	req, err := http.NewRequest("GET", "https://www.reddit.com/r/"+subreddit+"/search.json?q="+strings.Replace(term, " ", "+", -1)+"&restrict_sr=on&sort=relevance&t=all", nil)
+	log.Println(req.URL.String())
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Resistance Telegram Bot")
+	req.AddCookie(reddit.cookie)
+
+	// Actually query reddit
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, err
+	}
+
+	respbytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	body := bytes.NewBuffer(respbytes)
+
+	type Response struct {
+		Data struct {
+			Children []struct {
+				Data *Submission
+			}
+		}
+	}
+
+	r := new(Response)
+
+	err = json.NewDecoder(body).Decode(r)
+	if err != nil {
+		return nil, err
+	}
+
+	submissions := make([]*Submission, len(r.Data.Children))
+	for i, child := range r.Data.Children {
+		submissions[i] = child.Data
+	}
+	return submissions, nil
 }

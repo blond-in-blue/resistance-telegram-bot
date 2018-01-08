@@ -19,7 +19,7 @@ import (
 )
 
 // Builds and returns commands with url.
-func getCommands(telebot Telegram, errorLogger func(string), redditSession *http.Cookie, modhash string) []func(Update) {
+func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func(string)) []func(Update) {
 
 	return []func(update Update){
 
@@ -67,7 +67,7 @@ func getCommands(telebot Telegram, errorLogger func(string), redditSession *http
 		func(update Update) {
 			commands := strings.SplitAfter(update.Message.Text, "/save")
 			if len(commands) > 1 {
-				go SaveCommand(strings.TrimSpace(commands[1]), telebot, update, errorLogger, redditSession, modhash)
+				go SaveCommand(strings.TrimSpace(commands[1]), telebot, update, errorLogger, redditSession)
 			}
 		},
 
@@ -135,8 +135,8 @@ func initRoutes(router *gin.Engine, errors *[]string) {
 
 func listenForUpdates(telebot Telegram, errorLogger func(string)) {
 
-	cookie, modhash := logginToReddit(errorLogger)
-	commands := getCommands(telebot, errorLogger, cookie, modhash)
+	redditUser := logginToReddit(errorLogger)
+	commands := getCommands(telebot, redditUser, errorLogger)
 
 	for {
 		// Sleep first, so if we error out and continue to the next loop, we still end up waiting
@@ -168,10 +168,10 @@ func getTime() string {
 	return t.Format("Mon Jan _2 15:04:05 UTC-01:00 2006")
 }
 
-func logginToReddit(errorLogger func(string)) (*http.Cookie, string) {
+func logginToReddit(errorLogger func(string)) RedditAccount {
 
 	log.Printf("Logging into: %s\n", os.Getenv("REDDIT_USERNAME"))
-	cookie, modhash, err := MyLoginSession(
+	user, err := LoginToReddit(
 		os.Getenv("REDDIT_USERNAME"),
 		os.Getenv("REDDIT_PASSWORD"),
 		"Resistance Telegram Botter",
@@ -182,7 +182,7 @@ func logginToReddit(errorLogger func(string)) (*http.Cookie, string) {
 		log.Println(fmt.Sprintf("Succesfully logged in."))
 	}
 
-	return cookie, modhash
+	return user
 }
 
 func main() {
