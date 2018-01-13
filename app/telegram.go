@@ -15,22 +15,30 @@ import (
 	"strconv"
 )
 
+// NewTelegramBot Creates a new telegram bot
+func NewTelegramBot(key string, errorLogger func(string)) *Telegram {
+	t := Telegram{
+		key:         key,
+		errorLogger: errorLogger,
+		lastUpdate:  0,
+		url:         fmt.Sprintf("https://api.telegram.org/bot%s/", key),
+	}
+	return &t
+}
+
 // Telegram struct for taking care of commands
 type Telegram struct {
 	key         string
 	errorLogger func(string)
 	lastUpdate  int
-}
-
-func (telebot Telegram) getURL() string {
-	return fmt.Sprintf("https://api.telegram.org/bot%s/", telebot.key)
+	url         string
 }
 
 // SendMessage Resposible for sending a message to the appropriate group chat
 func (telebot Telegram) SendMessage(message string, chatID int64) {
 
 	// Send Message to telegram's api
-	resp, err := http.Post(telebot.getURL()+"sendMessage", "application/json", bytes.NewBuffer([]byte(`{
+	resp, err := http.Post(telebot.url+"sendMessage", "application/json", bytes.NewBuffer([]byte(`{
 		"chat_id": `+strconv.FormatInt(chatID, 10)+`,
 		"text": "`+message+`",
 		"parse_mode": "HTML"
@@ -52,7 +60,7 @@ func (telebot Telegram) SendMessage(message string, chatID int64) {
 
 // GetUpdates queries telegram for latest updates
 func (telebot *Telegram) GetUpdates() ([]Update, error) {
-	resp, err := http.Get(telebot.getURL() + "getUpdates?offset=" + strconv.Itoa(telebot.lastUpdate))
+	resp, err := http.Get(telebot.url + "getUpdates?offset=" + strconv.Itoa(telebot.lastUpdate))
 
 	// Sometimes Telegram will just randomly send a 502
 	if err != nil || resp.StatusCode != 200 {
@@ -107,7 +115,7 @@ func (telebot Telegram) sendImage(path string, chatID int64) {
 
 	w.Close()
 
-	req, err := http.NewRequest("POST", telebot.getURL()+"sendPhoto", &b)
+	req, err := http.NewRequest("POST", telebot.url+"sendPhoto", &b)
 	if err != nil {
 		telebot.errorLogger(err.Error())
 	}

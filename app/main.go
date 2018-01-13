@@ -210,13 +210,9 @@ func main() {
 		errorMessages = append(newMsg[:], errorMessages...)
 	}
 
-	teleBot := Telegram{
-		key:         os.Getenv("TELE_KEY"),
-		errorLogger: errorLogger,
-		lastUpdate:  0,
-	}
+	teleBot := NewTelegramBot(os.Getenv("TELE_KEY"), errorLogger)
 
-	go listenForUpdates(teleBot, errorLogger)
+	go listenForUpdates(*teleBot, errorLogger)
 
 	// Create our engine
 	r := gin.New()

@@ -47,6 +47,7 @@ type Message struct {
 	PinnedMessage         *Message         `json:"pinned_message"`          // optional
 }
 
+// ToString nicely formats the message of console output
 func (message Message) ToString() string {
 
 	id := strconv.FormatInt(message.Chat.ID, 10)
@@ -58,12 +59,12 @@ func (message Message) ToString() string {
 
 	content := message.Text
 	if message.Sticker != nil {
-		content = "<sticker>"
+		content = fmt.Sprintf("<sticker ( %s )>", message.Sticker.Emoji)
 	} else if message.Photo != nil {
 		content = "<photo>"
 	}
 
-	displayname := message.From.FirstName + " " + message.From.LastName
+	displayname := fmt.Sprintf("%s %s", message.From.FirstName, message.From.LastName)
 
 	return fmt.Sprintf("[%s] %s: %s", chat, displayname, content)
 }
