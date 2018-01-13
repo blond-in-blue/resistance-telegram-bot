@@ -160,7 +160,7 @@ func listenForUpdates(telebot Telegram, errorLogger func(string)) {
 		// Dispatch incoming messages to appropriate functions
 		for _, update := range updates {
 			if update.Message != nil {
-				log.Println("Msg: " + update.Message.Text)
+				log.Println(update.Message.ToString())
 				for _, command := range commands {
 					command(update)
 				}

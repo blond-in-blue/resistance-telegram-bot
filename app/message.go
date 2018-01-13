@@ -1,5 +1,10 @@
 package main
 
+import (
+	"fmt"
+	"strconv"
+)
+
 // MessageEntity contains information about data in a Message.
 type MessageEntity struct {
 	Type   string `json:"type"`
@@ -40,4 +45,25 @@ type Message struct {
 	MigrateToChatID       int64            `json:"migrate_to_chat_id"`      // optional
 	MigrateFromChatID     int64            `json:"migrate_from_chat_id"`    // optional
 	PinnedMessage         *Message         `json:"pinned_message"`          // optional
+}
+
+func (message Message) ToString() string {
+
+	id := strconv.FormatInt(message.Chat.ID, 10)
+
+	chat := message.Chat.Title + "@" + id
+	if message.Chat.UserName != "" {
+		chat = message.Chat.UserName + "@" + id
+	}
+
+	content := message.Text
+	if message.Sticker != nil {
+		content = "<sticker>"
+	} else if message.Photo != nil {
+		content = "<photo>"
+	}
+
+	displayname := message.From.FirstName + " " + message.From.LastName
+
+	return fmt.Sprintf("[%s] %s: %s", chat, displayname, content)
 }
