@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -71,9 +71,8 @@ func min(a, b int) int {
 	return b
 }
 
-func pokedexSerach(term string, telebot Telegram, update Update, errorLogger func(string)) {
+func pokedexSearch(term string, telebot Telegram, update Update, errorLogger func(string)) {
 
-	log.Println("searching pokedex: " + term)
 	searchURL := "https://pokeapi.co/api/v2/pokemon/" + strings.ToLower(term)
 	resp, err := http.Get(searchURL)
 
@@ -99,50 +98,69 @@ func pokedexSerach(term string, telebot Telegram, update Update, errorLogger fun
 		return
 	}
 
-	returnMessage := "<b>" + strings.ToUpper(r.Name) + "</b>\n<i>"
+	var returnMsg bytes.Buffer
+
+	returnMsg.WriteString("<b>")
+	returnMsg.WriteString(strings.ToUpper(r.Name))
+	returnMsg.WriteString("</b>\n<i>")
 
 	// Get the types
 	for i := 0; i < len(r.Types); i++ {
-		returnMessage += r.Types[i].Type.Name
+		returnMsg.WriteString(r.Types[i].Type.Name)
 		if i < len(r.Types)-1 {
-			returnMessage += " - "
+			returnMsg.WriteString(" - ")
 		}
 	}
 
-	// basic info
-	returnMessage += " type\n</i>Weight: " + strconv.FormatFloat(float64(r.Weight)/10.0, 'f', -1, 32) + "kg\n"
-	returnMessage += "Height: " + strconv.FormatFloat(float64(r.Height)/10.0, 'f', -1, 32) + "m\n"
-	returnMessage += "Base Exp: " + strconv.Itoa(r.BaseExperience) + "\n"
+	// Weight
+	returnMsg.WriteString(" type\n</i>Weight: ")
+	returnMsg.WriteString(strconv.FormatFloat(float64(r.Weight)/10.0, 'f', -1, 32))
+	returnMsg.WriteString("kg\n")
+
+	// Height
+	returnMsg.WriteString("Height: ")
+	returnMsg.WriteString(strconv.FormatFloat(float64(r.Height)/10.0, 'f', -1, 32))
+	returnMsg.WriteString("m\n")
+
+	// Base experience
+	returnMsg.WriteString("Base Exp: ")
+	returnMsg.WriteString(strconv.Itoa(r.BaseExperience))
+	returnMsg.WriteString("\n")
 
 	// Get the moves
-	returnMessage += "\nMoves: <i>"
+	returnMsg.WriteString("\nMoves: <i>")
 	numberMovesToList := min(len(r.Moves), 4)
 	for i := 0; i < numberMovesToList; i++ {
-		returnMessage += r.Moves[i].Move.Name
+		returnMsg.WriteString(r.Moves[i].Move.Name)
 		if i < numberMovesToList-1 {
-			returnMessage += ", "
+			returnMsg.WriteString(", ")
 		}
 	}
 
 	if len(r.Moves) > 4 {
-		returnMessage += ", and " + strconv.Itoa(len(r.Moves)-4) + " others"
+		returnMsg.WriteString(", and ")
+		returnMsg.WriteString(strconv.Itoa(len(r.Moves) - 4))
+		returnMsg.WriteString(" others")
 	}
 
 	// Get the moves
-	returnMessage += "</i>\n\nAbilities: <i>"
+	returnMsg.WriteString("</i>\n\nAbilities: <i>")
 	numberMovesToList = min(len(r.Abilities), 4)
 	for i := 0; i < numberMovesToList; i++ {
-		returnMessage += r.Abilities[i].Ability.Name
+		returnMsg.WriteString(r.Abilities[i].Ability.Name)
 		if i < numberMovesToList-1 {
-			returnMessage += ", "
+			returnMsg.WriteString(", ")
 		}
 	}
 
 	if len(r.Abilities) > 4 {
-		returnMessage += ", and " + strconv.Itoa(len(r.Abilities)-4) + " others"
+		returnMsg.WriteString(", and ")
+		returnMsg.WriteString(strconv.Itoa(len(r.Abilities) - 4))
+		returnMsg.WriteString(" others")
 	}
 
-	returnMessage += "</i>\n\n" + r.Sprites.FrontDefault
+	returnMsg.WriteString("</i>\n\n")
+	returnMsg.WriteString(r.Sprites.FrontDefault)
 
-	telebot.SendMessage(returnMessage, update.Message.Chat.ID)
+	telebot.SendMessage(returnMsg.String(), update.Message.Chat.ID)
 }

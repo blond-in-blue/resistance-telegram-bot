@@ -18,6 +18,14 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 )
 
+func getContentFromCommand(message string, command string) (bool, string) {
+	commands := strings.SplitAfter(message, fmt.Sprintf("/%s ", command))
+	if len(commands) > 1 {
+		return true, strings.TrimSpace(commands[1])
+	}
+	return false, ""
+}
+
 // Builds and returns commands with url.
 func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func(string)) []func(Update) {
 
@@ -29,21 +37,20 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 			if (strings.Contains(msg, "eli") || strings.Contains(msg, "b02s2")) && strings.Contains(msg, "furry") {
 				go telebot.SendMessage("Actually, "+update.Message.From.UserName+" is the furry", update.Message.Chat.ID)
 			}
-
 		},
 
 		// Kill command
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "/kill")
-			if len(commands) > 1 {
+			matches, commands := getContentFromCommand(update.Message.Text, "kill")
+			if matches && commands != "" {
 				n := rand.Int() % len(killStatements)
-				go telebot.SendMessage(strings.TrimSpace(commands[1])+killStatements[n], update.Message.Chat.ID)
+				go telebot.SendMessage(commands+killStatements[n], update.Message.Chat.ID)
 			}
 		},
 
 		// Traps command
 		func(update Update) {
-			if strings.Contains(update.Message.Text, "/traps") {
+			if update.Message.Text == "/traps" {
 				go telebot.SendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", update.Message.Chat.ID)
 			}
 		},
@@ -57,48 +64,44 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 
 		// Rule34 command
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "/rule34")
-			if len(commands) > 1 {
-				go rule34Search(strings.TrimSpace(commands[1]), telebot, update, errorLogger, redditSession)
+			matches, commands := getContentFromCommand(update.Message.Text, "rule34")
+			if matches && commands != "" {
+				go rule34Search(commands, telebot, update, errorLogger, redditSession)
 			}
 		},
 
 		// Hedgehog
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "/hedgehog")
-			if len(commands) > 1 {
-				go hedgeHogCommand(strings.TrimSpace(commands[1]), telebot, update, errorLogger, redditSession)
+			matches, commands := getContentFromCommand(update.Message.Text, "hedgehog")
+			if matches && commands != "" {
+				go hedgeHogCommand(commands, telebot, update, errorLogger, redditSession)
 			}
 		},
 
 		// Save command
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "/save")
-			if len(commands) > 1 {
-				go SaveCommand(strings.TrimSpace(commands[1]), telebot, update, errorLogger, redditSession)
+			matches, commands := getContentFromCommand(update.Message.Text, "save")
+			if matches && commands != "" {
+				go SaveCommand(commands, telebot, update, errorLogger, redditSession)
 			}
 		},
 
 		//pokedexSerach
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "/pokedex")
-			if len(commands) > 1 {
-				go pokedexSerach(strings.TrimSpace(commands[1]), telebot, update, errorLogger)
+			matches, commands := getContentFromCommand(update.Message.Text, "pokedex")
+			if matches && commands != "" {
+				go pokedexSearch(commands, telebot, update, errorLogger)
 			}
 		},
 
 		func(update Update) {
-			commands := strings.SplitAfter(update.Message.Text, "/murder")
-			if len(commands) > 1 {
-				text := strings.TrimSpace(commands[1])
-				// Don't put anything if they didn't give us anything
-				if text == "" {
-					return
+			matches, commands := getContentFromCommand(update.Message.Text, "murder")
+			if matches && commands != "" {
+
+				if commands == "me" {
+					commands = update.Message.From.UserName
 				}
 
-				if text == "me" {
-					text = update.Message.From.UserName
-				}
 				im, err := gg.LoadPNG("murder/test.png")
 				if err != nil {
 					errorLogger("unable to load image: " + err.Error())
@@ -115,7 +118,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 					Size: 70,
 				})
 				dc.SetFontFace(face)
-				dc.DrawStringAnchored(text, 500, 120, 0.0, 0.0)
+				dc.DrawStringAnchored(commands, 500, 120, 0.0, 0.0)
 				dc.SavePNG("media/out.png")
 				telebot.sendImage("media/out.png", update.Message.Chat.ID)
 			}
