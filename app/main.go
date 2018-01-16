@@ -60,11 +60,16 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 			matches, _ := getContentFromCommand(update.Message.Text, "ejaculate")
 			if matches {
 				for msg := range buffer.Everything() {
-					telebot.SendMessage(msg.Text, update.Message.Chat.ID)
+					if msg.Photo != nil {
+						photos := *msg.Photo
+						telebot.SendPhotoByID(photos[0].FileID, update.Message.Chat.ID)
+					} else if msg.Sticker != nil {
+						telebot.SendSticker(msg.Sticker.FileID, update.Message.Chat.ID)
+					} else {
+						telebot.SendMessage(msg.Text, update.Message.Chat.ID)
+					}
 				}
 				buffer = make([]Message, 0)
-				// photos := *update.Message.ReplyToMessage.Photo
-				// go telebot.GetImage(photos[0].FileID)
 			}
 		},
 

@@ -152,6 +152,17 @@ func (telebot Telegram) deleteMessage(chatID int64, messageID int) (bool, error)
 
 }
 
+// SendPhotoByID send photo by already existing file id
+func (telebot Telegram) SendPhotoByID(fileID string, chatID int64) error {
+	_, err := http.Get(fmt.Sprintf("%ssendPhoto?chat_id=%s&photo=%s", telebot.url, strconv.FormatInt(chatID, 10), fileID))
+	return err
+}
+
+func (telebot Telegram) SendSticker(fileID string, chatID int64) error {
+	_, err := http.Get(fmt.Sprintf("%ssendSticker?chat_id=%s&sticker=%s", telebot.url, strconv.FormatInt(chatID, 10), fileID))
+	return err
+}
+
 func (telebot Telegram) sendImage(path string, chatID int64) {
 	var b bytes.Buffer
 	var err error
