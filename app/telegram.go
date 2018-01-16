@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // NewTelegramBot Creates a new telegram bot
@@ -85,6 +87,69 @@ func (telebot *Telegram) GetUpdates() ([]Update, error) {
 	}
 
 	return updates.Result, nil
+}
+
+// GetImage Downloads an image by its file id and returns the filepath on the system
+func (telebot Telegram) GetImage(fileID string) (string, error) {
+	resp, err := http.Get(fmt.Sprintf("%sgetFile?file_id=%s", telebot.url, fileID))
+
+	if err != nil {
+		log.Println("Error: " + err.Error())
+		return "", err
+	}
+
+	var imageResponse GetImageResponse
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	err = json.Unmarshal([]byte(body), &imageResponse)
+	if err != nil {
+		log.Println("err: " + err.Error())
+		return "", err
+	}
+
+	if imageResponse.Ok == false {
+		return "", errors.New("telegram resolved unsucessfully")
+	}
+
+	resp, err = http.Get(fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", telebot.key, imageResponse.Result.FilePath))
+
+	if err != nil {
+		return "", err
+	}
+
+	fileSegments := strings.Split(imageResponse.Result.FilePath, ".")
+	filePath := "media/" + fileID + "." + fileSegments[len(fileSegments)-1]
+
+	output, err := os.Create(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = io.Copy(output, resp.Body)
+
+	if err != nil {
+		return "", err
+	}
+
+	return filePath, nil
+}
+
+func (telebot Telegram) deleteMessage(chatID int64, messageID int) (bool, error) {
+
+	resp, err := http.Get(fmt.Sprintf("%sdeleteMessage?chat_id=%s&message_id=%d", telebot.url, strconv.FormatInt(chatID, 10), messageID))
+
+	if err != nil {
+		log.Println("Error: " + err.Error())
+		return false, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	log.Printf(string(body))
+	return true, nil
+
 }
 
 func (telebot Telegram) sendImage(path string, chatID int64) {

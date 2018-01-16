@@ -19,7 +19,7 @@ import (
 )
 
 func getContentFromCommand(message string, command string) (bool, string) {
-	commands := strings.SplitAfter(message, fmt.Sprintf("/%s ", command))
+	commands := strings.SplitAfter(message, fmt.Sprintf("/%s", command))
 	if len(commands) > 1 {
 		return true, strings.TrimSpace(commands[1])
 	}
@@ -29,6 +29,8 @@ func getContentFromCommand(message string, command string) (bool, string) {
 // Builds and returns commands with url.
 func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func(string)) []func(Update) {
 
+	var buffer MessageStack
+
 	return []func(update Update){
 
 		// Eli is a furry command
@@ -36,6 +38,33 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 			msg := strings.ToLower(update.Message.Text)
 			if (strings.Contains(msg, "eli") || strings.Contains(msg, "b02s2")) && strings.Contains(msg, "furry") {
 				go telebot.SendMessage("Actually, "+update.Message.From.UserName+" is the furry", update.Message.Chat.ID)
+			}
+		},
+
+		func(update Update) {
+			matches, _ := getContentFromCommand(update.Message.Text, "edge")
+			if matches {
+
+				if update.Message.ReplyToMessage != nil {
+					buffer = buffer.Push(*update.Message.ReplyToMessage)
+					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID)
+					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.MessageID)
+				} else {
+					go telebot.SendMessage("Reply to message to edge", update.Message.Chat.ID)
+				}
+
+			}
+		},
+
+		func(update Update) {
+			matches, _ := getContentFromCommand(update.Message.Text, "ejaculate")
+			if matches {
+				for msg := range buffer.Everything() {
+					telebot.SendMessage(msg.Text, update.Message.Chat.ID)
+				}
+				buffer = make([]Message, 0)
+				// photos := *update.Message.ReplyToMessage.Photo
+				// go telebot.GetImage(photos[0].FileID)
 			}
 		},
 
@@ -134,6 +163,7 @@ func initRoutes(router *gin.Engine, errors *[]string) {
 	timeStarted := getTime()
 
 	router.GET("/", func(c *gin.Context) {
+		log.Println("Recieved request from: " + c.ClientIP())
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
 			"restarted": timeStarted,
 			"errors":    errors,
