@@ -32,7 +32,31 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 
 	allChatBuffers := make(map[string]MessageStack)
 
+	chatAliases := make(map[string]string)
+
 	return []func(update Update){
+
+		// alias command
+		func(update Update) {
+			matches, commands := getContentFromCommand(update.Message.Text, "alias-set")
+			if matches && commands != "" {
+				chatAliases[commands] = strconv.FormatInt(update.Message.Chat.ID, 10)
+				go telebot.SendMessage("Alias set as: "+commands, update.Message.Chat.ID)
+			}
+		},
+
+		// alias command
+		// func(update Update) {
+		// 	matches, _ := getContentFromCommand(update.Message.Text, "alias-get")
+		// 	if matches {
+		// 		alias, prs := chatAliases[strconv.FormatInt(update.Message.Chat.ID, 10)]
+		// 		if prs {
+		// 			go telebot.SendMessage("Alias set as: "+alias, update.Message.Chat.ID)
+		// 		} else {
+		// 			go telebot.SendMessage("No alias set! Use /alias-set <name> to set", update.Message.Chat.ID)
+		// 		}
+		// 	}
+		// },
 
 		// Eli is a furry command
 		func(update Update) {
@@ -55,6 +79,10 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 					location := strconv.FormatInt(update.Message.Chat.ID, 10)
 					if otherChatID != "" {
 						location = otherChatID
+						alias, prs := chatAliases[location]
+						if prs {
+							location = alias
+						}
 					}
 					allChatBuffers[location] = allChatBuffers[location].Push(*update.Message.ReplyToMessage)
 					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID)
