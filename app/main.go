@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,7 +30,7 @@ func getContentFromCommand(message string, command string) (bool, string) {
 // Builds and returns commands with url.
 func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func(string)) []func(Update) {
 
-	var buffer MessageStack
+	allChatBuffers := make(map[string]MessageStack)
 
 	return []func(update Update){
 
@@ -42,11 +43,20 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 		},
 
 		func(update Update) {
-			matches, _ := getContentFromCommand(update.Message.Text, "edge")
-			if matches {
+			if update.Message.Text == "/password" {
+				go telebot.SendMessage(strconv.FormatInt(update.Message.Chat.ID, 10), update.Message.Chat.ID)
+			}
+		},
 
+		func(update Update) {
+			matches, otherChatID := getContentFromCommand(update.Message.Text, "edge")
+			if matches {
 				if update.Message.ReplyToMessage != nil {
-					buffer = buffer.Push(*update.Message.ReplyToMessage)
+					location := strconv.FormatInt(update.Message.Chat.ID, 10)
+					if otherChatID != "" {
+						location = otherChatID
+					}
+					allChatBuffers[location] = allChatBuffers[location].Push(*update.Message.ReplyToMessage)
 					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID)
 					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.MessageID)
 				} else {
@@ -59,17 +69,25 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 		func(update Update) {
 			matches, _ := getContentFromCommand(update.Message.Text, "ejaculate")
 			if matches {
+				msgSent := false
+				buffer := allChatBuffers[strconv.FormatInt(update.Message.Chat.ID, 10)]
 				for msg := range buffer.Everything() {
+					msgSent = true
 					if msg.Photo != nil {
 						photos := *msg.Photo
+						telebot.SendMessage(msg.From.UserName+" sent:", update.Message.Chat.ID)
 						telebot.SendPhotoByID(photos[0].FileID, update.Message.Chat.ID)
 					} else if msg.Sticker != nil {
+						telebot.SendMessage(msg.From.UserName+" sent:", update.Message.Chat.ID)
 						telebot.SendSticker(msg.Sticker.FileID, update.Message.Chat.ID)
 					} else {
-						telebot.SendMessage(msg.Text, update.Message.Chat.ID)
+						telebot.SendMessage(fmt.Sprintf("%s sent:\n%s", msg.From.UserName, msg.Text), update.Message.Chat.ID)
 					}
 				}
-				buffer = make([]Message, 0)
+				if msgSent == false {
+					telebot.SendMessage("Im all tapped out", update.Message.Chat.ID)
+				}
+				allChatBuffers[strconv.FormatInt(update.Message.Chat.ID, 10)] = make([]Message, 0)
 			}
 		},
 
