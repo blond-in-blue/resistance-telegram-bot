@@ -119,6 +119,7 @@ func hedgeHogCommand(term string, telebot Telegram, update Update, errorLogger f
 
 }
 
+// SaveCommand posts to our subreddit
 func SaveCommand(term string, telebot Telegram, update Update, errorLogger func(string), redditSession RedditAccount) {
 
 	if update.Message.ReplyToMessage == nil {

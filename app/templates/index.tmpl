@@ -16,6 +16,8 @@
 
 <body>
 	<h1>Resistance Telegram Bot is Running</h1>
+	<div> Enter Chat ID (no alias) To view Message Buffer: <input id='chatID' type='text'> 
+	<button onclick="location.href = '/edge/'+(document.getElementById('chatID').value)">View</button></div>
 	<h2>Errors that have occurred  since last restart</h2>
 	{{range .errors}}
 		<div class="error">{{.}} </div>

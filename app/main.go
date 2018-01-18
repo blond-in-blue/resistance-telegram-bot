@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 	"math/rand"
 	"net/http"
@@ -28,9 +29,7 @@ func getContentFromCommand(message string, command string) (bool, string) {
 }
 
 // Builds and returns commands with url.
-func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func(string)) []func(Update) {
-
-	allChatBuffers := make(map[string]MessageStack)
+func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func(string), msgBuffer map[string]MessageStack) []func(Update) {
 
 	chatAliases := make(map[string]string)
 
@@ -40,8 +39,15 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 		func(update Update) {
 			matches, commands := getContentFromCommand(update.Message.Text, "alias-set")
 			if matches && commands != "" {
-				chatAliases[commands] = strconv.FormatInt(update.Message.Chat.ID, 10)
-				go telebot.SendMessage("Alias set as: "+commands, update.Message.Chat.ID)
+
+				_, alreadyExists := chatAliases[commands]
+				if alreadyExists {
+					go telebot.SendMessage(fmt.Sprintf("Someone has already taken the alias '%s'", commands), update.Message.Chat.ID)
+				} else {
+					chatAliases[commands] = strconv.FormatInt(update.Message.Chat.ID, 10)
+					go telebot.SendMessage(fmt.Sprintf("Alias set as: '%s'", commands), update.Message.Chat.ID)
+				}
+
 			}
 		},
 
@@ -84,7 +90,15 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 							location = alias
 						}
 					}
-					allChatBuffers[location] = allChatBuffers[location].Push(*update.Message.ReplyToMessage)
+					msgBuffer[location] = msgBuffer[location].Push(*update.Message.ReplyToMessage)
+					if update.Message.ReplyToMessage.Photo != nil {
+						photos := *update.Message.ReplyToMessage.Photo
+						go telebot.GetImage(photos[0].FileID)
+					}
+					if update.Message.ReplyToMessage.Sticker != nil {
+						sticker := *update.Message.ReplyToMessage.Sticker
+						go telebot.GetImage(sticker.FileID)
+					}
 					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID)
 					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.MessageID)
 				} else {
@@ -98,7 +112,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 			matches, _ := getContentFromCommand(update.Message.Text, "ejaculate")
 			if matches {
 				msgSent := false
-				buffer := allChatBuffers[strconv.FormatInt(update.Message.Chat.ID, 10)]
+				buffer := msgBuffer[strconv.FormatInt(update.Message.Chat.ID, 10)]
 				for msg := range buffer.Everything() {
 					msgSent = true
 					if msg.Photo != nil {
@@ -115,7 +129,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 				if msgSent == false {
 					telebot.SendMessage("Im all tapped out", update.Message.Chat.ID)
 				}
-				allChatBuffers[strconv.FormatInt(update.Message.Chat.ID, 10)] = make([]Message, 0)
+				msgBuffer[strconv.FormatInt(update.Message.Chat.ID, 10)] = make([]Message, 0)
 			}
 		},
 
@@ -161,8 +175,13 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 		// Save command
 		func(update Update) {
 			matches, commands := getContentFromCommand(update.Message.Text, "save")
-			if matches && commands != "" {
-				go SaveCommand(commands, telebot, update, errorLogger, redditSession)
+			if matches {
+				if commands != "" {
+					go SaveCommand(commands, telebot, update, errorLogger, redditSession)
+				} else {
+					go telebot.SendMessage("Please provide a title for the post.", update.Message.Chat.ID)
+				}
+
 			}
 		},
 
@@ -197,6 +216,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 				face := truetype.NewFace(font, &truetype.Options{
 					Size: 70,
 				})
+
 				dc.SetFontFace(face)
 				dc.DrawStringAnchored(commands, 500, 120, 0.0, 0.0)
 				dc.SavePNG("media/out.png")
@@ -207,17 +227,43 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 }
 
 // Create our routes
-func initRoutes(router *gin.Engine, errors *[]string) {
+func initRoutes(router *gin.Engine, errors *[]string, msgBuffer map[string]MessageStack) {
 
-	router.LoadHTMLFiles("templates/index.tmpl")
+	router.SetFuncMap(template.FuncMap{
+		"pictureDeref": func(i *[]PhotoSize) PhotoSize {
+			if i == nil {
+				return PhotoSize{}
+			}
+
+			photos := *i
+			return photos[0]
+		},
+		"stickerDeref": func(i *Sticker) Sticker {
+			if i == nil {
+				return Sticker{}
+			}
+			return *i
+		},
+	})
+
+	router.LoadHTMLGlob("templates/*.tmpl")
 
 	timeStarted := getTime()
 
 	router.GET("/", func(c *gin.Context) {
-		log.Println("Recieved request from: " + c.ClientIP())
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
 			"restarted": timeStarted,
 			"errors":    errors,
+		})
+	})
+
+	router.GET("/edge/:chatID", func(c *gin.Context) {
+		chatID := c.Param("chatID")
+		msgs, _ := msgBuffer[chatID]
+		//msgs[0].Photo
+		log.Println(msgs)
+		c.HTML(http.StatusOK, "edge.tmpl", gin.H{
+			"messages": msgs,
 		})
 	})
 
@@ -225,10 +271,10 @@ func initRoutes(router *gin.Engine, errors *[]string) {
 
 }
 
-func listenForUpdates(telebot Telegram, errorLogger func(string)) {
+func listenForUpdates(telebot Telegram, errorLogger func(string), msgBuffer map[string]MessageStack) {
 
 	redditUser := logginToReddit(errorLogger)
-	commands := getCommands(telebot, redditUser, errorLogger)
+	commands := getCommands(telebot, redditUser, errorLogger, msgBuffer)
 
 	for {
 		// Sleep first, so if we error out and continue to the next loop, we still end up waiting
@@ -287,6 +333,9 @@ func main() {
 	}
 	log.Printf("Starting bot using port %s\n", port)
 
+	// Create buffers for all the chats.
+	allChatBuffers := make(map[string]MessageStack)
+
 	errorMessages := []string{}
 	var errorLogger = func(msg string) {
 		log.Println(msg)
@@ -296,7 +345,7 @@ func main() {
 
 	teleBot := NewTelegramBot(os.Getenv("TELE_KEY"), errorLogger)
 
-	go listenForUpdates(*teleBot, errorLogger)
+	go listenForUpdates(*teleBot, errorLogger, allChatBuffers)
 
 	// Create our engine
 	r := gin.New()
@@ -307,7 +356,7 @@ func main() {
 	// Recover from errors and return 500
 	r.Use(gin.Recovery())
 
-	initRoutes(r, &errorMessages)
+	initRoutes(r, &errorMessages, allChatBuffers)
 	r.Run(":" + port)
 
 }

@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 )
 
 // NewTelegramBot Creates a new telegram bot
@@ -93,6 +92,8 @@ func (telebot *Telegram) GetUpdates() ([]Update, error) {
 func (telebot Telegram) GetImage(fileID string) (string, error) {
 	resp, err := http.Get(fmt.Sprintf("%sgetFile?file_id=%s", telebot.url, fileID))
 
+	log.Println("Begining download")
+
 	if err != nil {
 		log.Println("Error: " + err.Error())
 		return "", err
@@ -120,8 +121,7 @@ func (telebot Telegram) GetImage(fileID string) (string, error) {
 		return "", err
 	}
 
-	fileSegments := strings.Split(imageResponse.Result.FilePath, ".")
-	filePath := "media/" + fileID + "." + fileSegments[len(fileSegments)-1]
+	filePath := "media/" + fileID
 
 	output, err := os.Create(filePath)
 	if err != nil {
@@ -133,6 +133,8 @@ func (telebot Telegram) GetImage(fileID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	log.Println("Succesfully downloaded")
 
 	return filePath, nil
 }

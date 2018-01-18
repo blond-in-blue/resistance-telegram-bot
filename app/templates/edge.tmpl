@@ -1,0 +1,44 @@
+<html>
+
+<head>
+	<style>
+		html {
+			font-family: consolas;
+		}
+
+		.error {
+			margin: 8px;
+			padding: 8px;
+			background-color: rgba(0, 0, 0, 0.1);
+		}
+	</style>
+</head>
+
+<body>
+	<h1>Edge Buffer:</h1>
+	
+    
+    {{range .messages}}
+		<div class="error">
+
+        {{.From.UserName}} sent:
+
+        {{if  ( .Photo | pictureDeref ).FileID}} 
+            <br>
+            <img src="/media/{{( .Photo | pictureDeref ).FileID}}" alt="Buffered Picture">
+        {{else if  ( .Sticker | stickerDeref ).FileID}} 
+            <br>
+            <img src="/media/{{( .Sticker | stickerDeref ).FileID}}" alt="Buffered Sticker">
+        {{else}} 
+            "{{.Text}}"
+         {{end}}
+
+        </div>
+
+	{{else}}
+		<h3>No messages have been edged</h3>
+	{{end}}
+
+</body>
+
+</html>
