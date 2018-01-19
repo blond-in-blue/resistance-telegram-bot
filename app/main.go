@@ -49,19 +49,6 @@ func getCommands(telebot TeleBot) []func(Update) {
 			}
 		},
 
-		// alias command
-		// func(update Update) {
-		// 	matches, _ := getContentFromCommand(update.Message.Text, "alias-get")
-		// 	if matches {
-		// 		alias, prs := chatAliases[strconv.FormatInt(update.Message.Chat.ID, 10)]
-		// 		if prs {
-		// 			go telebot.SendMessage("Alias set as: "+alias, update.Message.Chat.ID)
-		// 		} else {
-		// 			go telebot.SendMessage("No alias set! Use /alias-set <name> to set", update.Message.Chat.ID)
-		// 		}
-		// 	}
-		// },
-
 		// Eli is a furry command
 		func(update Update) {
 			msg := strings.ToLower(update.Message.Text)
@@ -101,23 +88,26 @@ func getCommands(telebot TeleBot) []func(Update) {
 		func(update Update) {
 			matches, _ := getContentFromCommand(update.Message.Text, "ejaculate")
 			if matches {
-				msgSent := false
-				for msg := range telebot.ClearBuffer(update.Message.Chat.ID) {
-					msgSent = true
-					if msg.Photo != nil {
-						photos := *msg.Photo
-						telebot.SendMessage(msg.From.UserName+" sent:", update.Message.Chat.ID)
-						telebot.SendPhotoByID(photos[0].FileID, update.Message.Chat.ID)
-					} else if msg.Sticker != nil {
-						telebot.SendMessage(msg.From.UserName+" sent:", update.Message.Chat.ID)
-						telebot.SendSticker(msg.Sticker.FileID, update.Message.Chat.ID)
-					} else {
-						telebot.SendMessage(fmt.Sprintf("%s sent:\n%s", msg.From.UserName, msg.Text), update.Message.Chat.ID)
+				go func() {
+					msgSent := false
+					for msg := range telebot.ClearBuffer(update.Message.Chat.ID) {
+						msgSent = true
+						if msg.Photo != nil {
+							photos := *msg.Photo
+							telebot.SendMessage(msg.From.UserName+" sent:", update.Message.Chat.ID)
+							telebot.SendPhotoByID(photos[0].FileID, update.Message.Chat.ID)
+						} else if msg.Sticker != nil {
+							telebot.SendMessage(msg.From.UserName+" sent:", update.Message.Chat.ID)
+							telebot.SendSticker(msg.Sticker.FileID, update.Message.Chat.ID)
+						} else {
+							telebot.SendMessage(fmt.Sprintf("%s sent:\n%s", msg.From.UserName, msg.Text), update.Message.Chat.ID)
+						}
 					}
-				}
-				if msgSent == false {
-					telebot.SendMessage("Im all tapped out", update.Message.Chat.ID)
-				}
+
+					if msgSent == false {
+						telebot.SendMessage("Im all tapped out", update.Message.Chat.ID)
+					}
+				}()
 			}
 		},
 
@@ -313,9 +303,7 @@ func main() {
 	log.Printf("Starting bot using port %s\n", port)
 
 	errorReport := NewReport()
-	errorReport.Log("Test")
 	redditUser := logginToReddit(*errorReport)
-
 	teleBot := NewTelegramBot(os.Getenv("TELE_KEY"), *errorReport, redditUser)
 
 	go listenForUpdates(*teleBot)
