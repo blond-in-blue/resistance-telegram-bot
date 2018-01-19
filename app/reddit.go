@@ -83,12 +83,12 @@ func LoginToReddit(username, password, useragent string) (RedditAccount, error) 
 	return RedditAccount{redditCookie, modhash}, nil
 }
 
-func rule34Search(term string, telebot Telegram, update Update, errorLogger func(string), redditSession RedditAccount) {
+func rule34Search(term string, telebot TeleBot, update Update) {
 
-	submissions, err := redditSession.SearchSubreddit("rule34", term)
+	submissions, err := telebot.redditUser.SearchSubreddit("rule34", term)
 
 	if err != nil {
-		errorLogger("Error searching subreddit: " + err.Error())
+		telebot.errorReport.Log("Error searching subreddit: " + err.Error())
 		telebot.SendMessage("Error searching subreddit", update.Message.Chat.ID)
 		return
 	}
@@ -101,12 +101,12 @@ func rule34Search(term string, telebot Telegram, update Update, errorLogger func
 
 }
 
-func hedgeHogCommand(term string, telebot Telegram, update Update, errorLogger func(string), redditSession RedditAccount) {
+func hedgeHogCommand(term string, telebot TeleBot, update Update) {
 
-	submissions, err := redditSession.SearchSubreddit("thehedgehog", term)
+	submissions, err := telebot.redditUser.SearchSubreddit("thehedgehog", term)
 
 	if err != nil {
-		errorLogger("Error searching subreddit: " + err.Error())
+		telebot.errorReport.Log("Error searching subreddit: " + err.Error())
 		telebot.SendMessage("Error searching", update.Message.Chat.ID)
 		return
 	}
@@ -120,7 +120,7 @@ func hedgeHogCommand(term string, telebot Telegram, update Update, errorLogger f
 }
 
 // SaveCommand posts to our subreddit
-func SaveCommand(term string, telebot Telegram, update Update, errorLogger func(string), redditSession RedditAccount) {
+func SaveCommand(term string, telebot TeleBot, update Update) {
 
 	if update.Message.ReplyToMessage == nil {
 		telebot.SendMessage("Reply to a message and say save to save to the subreddit", update.Message.Chat.ID)
@@ -135,9 +135,9 @@ func SaveCommand(term string, telebot Telegram, update Update, errorLogger func(
 	//log.Println("Going to save... " + term)
 	log.Printf("update: %s", update.Message.ReplyToMessage.Text)
 
-	info, err := redditSession.PostToSubreddit(fmt.Sprintf("%s:\n\n%s", update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.Text), term, "smartestretards")
+	info, err := telebot.redditUser.PostToSubreddit(fmt.Sprintf("%s:\n\n%s", update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.Text), term, "smartestretards")
 	if err != nil {
-		errorLogger("Unable to post to reddit: " + err.Error())
+		telebot.errorReport.Log("Unable to post to reddit: " + err.Error())
 		telebot.SendMessage("Unable to post to reddit", update.Message.Chat.ID)
 	} else {
 		telebot.SendMessage(info, update.Message.Chat.ID)

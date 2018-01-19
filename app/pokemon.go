@@ -71,13 +71,13 @@ func min(a, b int) int {
 	return b
 }
 
-func pokedexSearch(term string, telebot Telegram, update Update, errorLogger func(string)) {
+func pokedexSearch(term string, telebot TeleBot, update Update) {
 
 	searchURL := "https://pokeapi.co/api/v2/pokemon/" + strings.ToLower(term)
 	resp, err := http.Get(searchURL)
 
 	if err != nil {
-		errorLogger("Error Searching Pokedex: " + err.Error())
+		telebot.errorReport.Log("Error Searching Pokedex: " + err.Error())
 		telebot.SendMessage("Error Searching Pokedex", update.Message.Chat.ID)
 		return
 	}
@@ -88,7 +88,7 @@ func pokedexSearch(term string, telebot Telegram, update Update, errorLogger fun
 	body, err := ioutil.ReadAll(resp.Body)
 	json.Unmarshal([]byte(body), &r)
 	if err != nil {
-		errorLogger("Error Parsing Pokedex Response: " + err.Error())
+		telebot.errorReport.Log("Error Parsing Pokedex Response: " + err.Error())
 		telebot.SendMessage("Error Reading Response From Pokedex", update.Message.Chat.ID)
 		return
 	}

@@ -29,23 +29,21 @@ func getContentFromCommand(message string, command string) (bool, string) {
 }
 
 // Builds and returns commands with url.
-func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func(string), msgBuffer map[string]MessageStack) []func(Update) {
-
-	chatAliases := make(map[string]string)
+func getCommands(telebot TeleBot) []func(Update) {
 
 	return []func(update Update){
 
 		// alias command
 		func(update Update) {
-			matches, commands := getContentFromCommand(update.Message.Text, "alias-set")
-			if matches && commands != "" {
+			matches, alias := getContentFromCommand(update.Message.Text, "alias-set")
+			if matches && alias != "" {
 
-				_, alreadyExists := chatAliases[commands]
+				_, alreadyExists := telebot.IsAliasSet(alias)
 				if alreadyExists {
-					go telebot.SendMessage(fmt.Sprintf("Someone has already taken the alias '%s'", commands), update.Message.Chat.ID)
+					go telebot.SendMessage(fmt.Sprintf("Someone has already taken the alias '%s'", alias), update.Message.Chat.ID)
 				} else {
-					chatAliases[commands] = strconv.FormatInt(update.Message.Chat.ID, 10)
-					go telebot.SendMessage(fmt.Sprintf("Alias set as: '%s'", commands), update.Message.Chat.ID)
+					telebot.SetChatAlias(alias, update.Message.Chat.ID)
+					go telebot.SendMessage(fmt.Sprintf("Alias set as: '%s'", alias), update.Message.Chat.ID)
 				}
 
 			}
@@ -82,15 +80,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 			matches, otherChatID := getContentFromCommand(update.Message.Text, "edge")
 			if matches {
 				if update.Message.ReplyToMessage != nil {
-					location := strconv.FormatInt(update.Message.Chat.ID, 10)
-					if otherChatID != "" {
-						location = otherChatID
-						alias, prs := chatAliases[location]
-						if prs {
-							location = alias
-						}
-					}
-					msgBuffer[location] = msgBuffer[location].Push(*update.Message.ReplyToMessage)
+					telebot.PushMessageToChatBuffer(otherChatID, *update.Message.ReplyToMessage)
 					if update.Message.ReplyToMessage.Photo != nil {
 						photos := *update.Message.ReplyToMessage.Photo
 						go telebot.GetImage(photos[0].FileID)
@@ -112,8 +102,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 			matches, _ := getContentFromCommand(update.Message.Text, "ejaculate")
 			if matches {
 				msgSent := false
-				buffer := msgBuffer[strconv.FormatInt(update.Message.Chat.ID, 10)]
-				for msg := range buffer.Everything() {
+				for msg := range telebot.ClearBuffer(update.Message.Chat.ID) {
 					msgSent = true
 					if msg.Photo != nil {
 						photos := *msg.Photo
@@ -129,7 +118,6 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 				if msgSent == false {
 					telebot.SendMessage("Im all tapped out", update.Message.Chat.ID)
 				}
-				msgBuffer[strconv.FormatInt(update.Message.Chat.ID, 10)] = make([]Message, 0)
 			}
 		},
 
@@ -160,7 +148,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 		func(update Update) {
 			matches, commands := getContentFromCommand(update.Message.Text, "rule34")
 			if matches && commands != "" {
-				go rule34Search(commands, telebot, update, errorLogger, redditSession)
+				go rule34Search(commands, telebot, update)
 			}
 		},
 
@@ -168,7 +156,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 		func(update Update) {
 			matches, commands := getContentFromCommand(update.Message.Text, "hedgehog")
 			if matches && commands != "" {
-				go hedgeHogCommand(commands, telebot, update, errorLogger, redditSession)
+				go hedgeHogCommand(commands, telebot, update)
 			}
 		},
 
@@ -177,7 +165,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 			matches, commands := getContentFromCommand(update.Message.Text, "save")
 			if matches {
 				if commands != "" {
-					go SaveCommand(commands, telebot, update, errorLogger, redditSession)
+					go SaveCommand(commands, telebot, update)
 				} else {
 					go telebot.SendMessage("Please provide a title for the post.", update.Message.Chat.ID)
 				}
@@ -189,7 +177,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 		func(update Update) {
 			matches, commands := getContentFromCommand(update.Message.Text, "pokedex")
 			if matches && commands != "" {
-				go pokedexSearch(commands, telebot, update, errorLogger)
+				go pokedexSearch(commands, telebot, update)
 			}
 		},
 
@@ -203,7 +191,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 
 				im, err := gg.LoadPNG("murder/test.png")
 				if err != nil {
-					errorLogger("unable to load image: " + err.Error())
+					telebot.errorReport.Log("unable to load image: " + err.Error())
 					return
 				}
 				dc := gg.NewContextForImage(im)
@@ -211,7 +199,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 				dc.SetRGB(1, 1, 1)
 				font, err := truetype.Parse(goregular.TTF)
 				if err != nil {
-					errorLogger(err.Error())
+					telebot.errorReport.Log(err.Error())
 				}
 				face := truetype.NewFace(font, &truetype.Options{
 					Size: 70,
@@ -227,7 +215,7 @@ func getCommands(telebot Telegram, redditSession RedditAccount, errorLogger func
 }
 
 // Create our routes
-func initRoutes(router *gin.Engine, errors *[]string, msgBuffer map[string]MessageStack) {
+func initRoutes(router *gin.Engine, telebot TeleBot) {
 
 	router.SetFuncMap(template.FuncMap{
 		"pictureDeref": func(i *[]PhotoSize) PhotoSize {
@@ -248,20 +236,18 @@ func initRoutes(router *gin.Engine, errors *[]string, msgBuffer map[string]Messa
 
 	router.LoadHTMLGlob("templates/*.tmpl")
 
-	timeStarted := getTime()
+	timeStarted := GetTime()
 
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
 			"restarted": timeStarted,
-			"errors":    errors,
+			"errors":    telebot.errorReport.Generate(),
 		})
 	})
 
 	router.GET("/edge/:chatID", func(c *gin.Context) {
 		chatID := c.Param("chatID")
-		msgs, _ := msgBuffer[chatID]
-		//msgs[0].Photo
-		log.Println(msgs)
+		msgs := telebot.ChatBuffer(chatID)
 		c.HTML(http.StatusOK, "edge.tmpl", gin.H{
 			"messages": msgs,
 		})
@@ -271,10 +257,9 @@ func initRoutes(router *gin.Engine, errors *[]string, msgBuffer map[string]Messa
 
 }
 
-func listenForUpdates(telebot Telegram, errorLogger func(string), msgBuffer map[string]MessageStack) {
+func listenForUpdates(telebot TeleBot) {
 
-	redditUser := logginToReddit(errorLogger)
-	commands := getCommands(telebot, redditUser, errorLogger, msgBuffer)
+	commands := getCommands(telebot)
 
 	for {
 		// Sleep first, so if we error out and continue to the next loop, we still end up waiting
@@ -283,7 +268,7 @@ func listenForUpdates(telebot Telegram, errorLogger func(string), msgBuffer map[
 		updates, err := telebot.GetUpdates()
 
 		if err != nil {
-			errorLogger("Error getting updates from telegram: " + err.Error())
+			telebot.errorReport.Log("Error getting updates from telegram: " + err.Error())
 			continue
 		}
 
@@ -300,13 +285,7 @@ func listenForUpdates(telebot Telegram, errorLogger func(string), msgBuffer map[
 	}
 }
 
-// Format the current time
-func getTime() string {
-	t := time.Now()
-	return t.Format("Mon Jan _2 15:04:05 UTC-01:00 2006")
-}
-
-func logginToReddit(errorLogger func(string)) RedditAccount {
+func logginToReddit(errorReport Report) RedditAccount {
 
 	log.Printf("Logging into: %s\n", os.Getenv("REDDIT_USERNAME"))
 	user, err := LoginToReddit(
@@ -315,7 +294,7 @@ func logginToReddit(errorLogger func(string)) RedditAccount {
 		"Resistance Telegram Botter",
 	)
 	if err != nil {
-		errorLogger("Error logging into reddit! " + err.Error())
+		errorReport.Log("Error logging into reddit! " + err.Error())
 	} else {
 		log.Println(fmt.Sprintf("Succesfully logged in."))
 	}
@@ -333,19 +312,13 @@ func main() {
 	}
 	log.Printf("Starting bot using port %s\n", port)
 
-	// Create buffers for all the chats.
-	allChatBuffers := make(map[string]MessageStack)
+	errorReport := NewReport()
+	errorReport.Log("Test")
+	redditUser := logginToReddit(*errorReport)
 
-	errorMessages := []string{}
-	var errorLogger = func(msg string) {
-		log.Println(msg)
-		newMsg := [...]string{getTime() + ": " + msg}
-		errorMessages = append(newMsg[:], errorMessages...)
-	}
+	teleBot := NewTelegramBot(os.Getenv("TELE_KEY"), *errorReport, redditUser)
 
-	teleBot := NewTelegramBot(os.Getenv("TELE_KEY"), errorLogger)
-
-	go listenForUpdates(*teleBot, errorLogger, allChatBuffers)
+	go listenForUpdates(*teleBot)
 
 	// Create our engine
 	r := gin.New()
@@ -356,7 +329,7 @@ func main() {
 	// Recover from errors and return 500
 	r.Use(gin.Recovery())
 
-	initRoutes(r, &errorMessages, allChatBuffers)
+	initRoutes(r, *teleBot)
 	r.Run(":" + port)
 
 }
