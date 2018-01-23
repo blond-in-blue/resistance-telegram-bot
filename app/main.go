@@ -245,6 +245,54 @@ func getCommands(telebot TeleBot) []func(Update) {
 				dc.SavePNG("media/roosterOut.png")
 				telebot.sendImage("media/roosterOut.png", update.Message.Chat.ID)
 			}
+
+		},
+
+		func(update Update) {
+			matches, commands := getContentFromCommand(update.Message.Text, "hunt")
+			if matches && commands != "" {
+
+				fighters := strings.Split(commands, " and ")
+
+				if len(fighters) < 2 {
+					return
+				}
+
+				left := strings.TrimSpace(fighters[0])
+				right := strings.TrimSpace(fighters[1])
+
+				if left == "me" {
+					left = update.Message.From.UserName
+				}
+
+				if right == "me" {
+					right = update.Message.From.UserName
+				}
+
+				im, err := gg.LoadPNG("murder/hunt.png")
+				if err != nil {
+					telebot.errorReport.Log("unable to load image: " + err.Error())
+					return
+				}
+				dc := gg.NewContextForImage(im)
+
+				dc.SetRGB(1, 1, 1)
+				font, err := truetype.Parse(goregular.TTF)
+				if err != nil {
+					telebot.errorReport.Log(err.Error())
+				}
+				face := truetype.NewFace(font, &truetype.Options{
+					Size: 40,
+				})
+
+				dc.SetFontFace(face)
+				dc.DrawStringAnchored(left, 100, 220, 0.0, 0.0)
+				dc.DrawStringAnchored(right, 300, 375, 0.0, 0.0)
+				dc.SavePNG("media/huntOut.png")
+				telebot.sendImage("media/huntOut.png", update.Message.Chat.ID)
+
+			}
+
 		},
 	}
 }
