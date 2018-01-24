@@ -31,4 +31,6 @@ var killStatements = []string{
 	" got baited haha XD",
 	" got /pushups'd on",
 	" opened Resistance after 5 PM",
+	" choked on a Tide Pod",
+	" is handing out with Logan Paul",
 }
