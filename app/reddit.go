@@ -189,7 +189,7 @@ func (r RedditAccount) PostToSubreddit(textPost string, title string, subreddit 
 
 func (reddit RedditAccount) SearchSubreddit(subreddit string, term string) ([]*Submission, error) {
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://www.reddit.com/r/%s/search.json?q=%s&restrict_sr=on&sort=relevance&t=all", subreddit, strings.Replace(term, " ", "+", -1)), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://www.reddit.com/r/%s/search.json?q=%s&restrict_sr=on&include_over_18=on&sort=relevance&t=all", subreddit, strings.Replace(term, " ", "+", -1)), nil)
 	if err != nil {
 		return nil, err
 	}

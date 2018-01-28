@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -49,11 +50,23 @@ func getCommands(telebot TeleBot) []func(Update) {
 			}
 		},
 
-		// Eli is a furry command
 		func(update Update) {
-			msg := strings.ToLower(update.Message.Text)
-			if (strings.Contains(msg, "eli") || strings.Contains(msg, "b02s2")) && strings.Contains(msg, "furry") {
-				go telebot.SendMessage("Actually, "+update.Message.From.UserName+" is the furry", update.Message.Chat.ID)
+			if update.Message.Text == "ahem" && update.Message.From.UserName == "B02s2" && update.Message.ReplyToMessage != nil {
+				go telebot.SendMessage("Actually, "+update.Message.ReplyToMessage.From.UserName+" is the furry", update.Message.Chat.ID)
+			}
+		},
+
+		func(update Update) {
+			matches, toMatch := getContentFromCommand(update.Message.Text, "s/")
+			if matches && toMatch != "" && update.Message.ReplyToMessage != nil {
+				cmds := strings.SplitAfter(toMatch, "/")
+				if len(cmds) < 2 {
+					return
+				}
+
+				re := regexp.MustCompile(cmds[0][:len(cmds[0])-1])
+				corrected := re.ReplaceAllString(update.Message.ReplyToMessage.Text, cmds[1])
+				go telebot.SendMessage(fmt.Sprintf("<b>Did you mean</b>:\n \"%s\"", corrected), update.Message.Chat.ID)
 			}
 		},
 
