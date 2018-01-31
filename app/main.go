@@ -63,9 +63,14 @@ func getCommands(telebot TeleBot) []func(Update) {
 				if len(cmds) < 2 {
 					return
 				}
-				re := regexp.MustCompile(cmds[0][:len(cmds[0])-1])
-				corrected := re.ReplaceAllString(update.Message.ReplyToMessage.Text, cmds[1])
-				go telebot.SendMessage(fmt.Sprintf("<b>Did you mean</b>:\n %s", corrected), update.Message.Chat.ID)
+				re, err := regexp.Compile(cmds[0][:len(cmds[0])-1])
+				if err == nil {
+					corrected := re.ReplaceAllString(update.Message.ReplyToMessage.Text, cmds[1])
+					go telebot.SendMessage(fmt.Sprintf("<b>Did you mean</b>:\n%s", corrected), update.Message.Chat.ID)
+				} else {
+					go telebot.SendMessage(fmt.Sprintf("<b>Invalid expression:</b>\n%s", err.Error()), update.Message.Chat.ID)
+				}
+
 			}
 		},
 
@@ -159,6 +164,13 @@ func getCommands(telebot TeleBot) []func(Update) {
 			matches, commands := getContentFromCommand(update.Message.Text, "hedgehog")
 			if matches && commands != "" {
 				go hedgeHogCommand(commands, telebot, update)
+			}
+		},
+
+		// Ping
+		func(update Update) {
+			if update.Message.Text == "/ping" {
+				go telebot.SendMessage("fuck u want", update.Message.Chat.ID)
 			}
 		},
 
