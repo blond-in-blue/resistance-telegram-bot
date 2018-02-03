@@ -91,12 +91,33 @@ func (telebot TeleBot) ChatBuffer(lookup string) MessageStack {
 // SendMessage Resposible for sending a message to the appropriate group chat
 func (telebot TeleBot) SendMessage(message string, chatID int64) {
 
-	// Send Message to telegram's api
-	resp, err := http.Post(telebot.url+"sendMessage", "application/json", bytes.NewBuffer([]byte(`{
-		"chat_id": `+strconv.FormatInt(chatID, 10)+`,
-		"text": "`+message+`",
-		"parse_mode": "HTML"
-	}`)))
+	postValues := map[string]string{
+		"chat_id":    strconv.FormatInt(chatID, 10),
+		"text":       message,
+		"parse_mode": "HTML",
+	}
+
+	jsonValue, err := json.Marshal(postValues)
+
+	if err != nil {
+		telebot.errorReport.Log("Error encoding json: " + err.Error())
+		return
+	}
+
+	req, err := http.NewRequest("POST", telebot.url+"sendMessage", bytes.NewBuffer(jsonValue))
+
+	if err != nil {
+		telebot.errorReport.Log("Error creating message: " + err.Error())
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		telebot.errorReport.Log("Error sending message: " + err.Error())
+		return
+	}
 
 	// Catch errors
 	if err != nil {

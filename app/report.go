@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -22,6 +23,7 @@ func NewReport() *Report {
 
 // Log an entry to the report for later
 func (report *Report) Log(msg string) {
+	log.Println(msg)
 	report.timeStamps = append(report.timeStamps, time.Now())
 	report.messages = append(report.messages, msg)
 }

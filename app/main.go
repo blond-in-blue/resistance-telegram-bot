@@ -66,7 +66,9 @@ func getCommands(telebot TeleBot) []func(Update) {
 				re, err := regexp.Compile(cmds[0][:len(cmds[0])-1])
 				if err == nil {
 					corrected := re.ReplaceAllString(update.Message.ReplyToMessage.Text, cmds[1])
-					go telebot.SendMessage(fmt.Sprintf("<b>Did you mean</b>:\n%s", corrected), update.Message.Chat.ID)
+					if corrected != update.Message.ReplyToMessage.Text {
+						go telebot.SendMessage(fmt.Sprintf("<b>Did you mean</b>:\n %s", corrected), update.Message.Chat.ID)
+					}
 				} else {
 					go telebot.SendMessage(fmt.Sprintf("<b>Invalid expression:</b>\n%s", err.Error()), update.Message.Chat.ID)
 				}
