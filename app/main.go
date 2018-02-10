@@ -108,9 +108,9 @@ func getCommands(telebot TeleBot) []func(Update) {
 			matches, _ := getContentFromCommand(update.Message.Text, "ejaculate")
 			if matches {
 				go func() {
-					msgSent := false
+					msgSentCount := 0
 					for msg := range telebot.ClearBuffer(update.Message.Chat.ID) {
-						msgSent = true
+						msgSentCount += 1
 						if msg.Photo != nil {
 							photos := *msg.Photo
 							telebot.SendMessage(msg.From.UserName+" sent:", update.Message.Chat.ID)
@@ -123,8 +123,14 @@ func getCommands(telebot TeleBot) []func(Update) {
 						}
 					}
 
-					if msgSent == false {
-						telebot.SendMessage("Im all tapped out", update.Message.Chat.ID)
+					if msgSentCount == 0 {
+						telebot.SendMessage("I'm not usually like this. Maybe if you do something sexy it'll start working", update.Message.Chat.ID)
+					} else if msgSentCount < 5 {
+						telebot.SendMessage("Normally I'm not that quick", update.Message.Chat.ID)
+					} else if msgSentCount < 10 {
+						telebot.SendMessage("I need a ciggarette after that", update.Message.Chat.ID)
+					} else {
+						telebot.SendMessage("HOLY FUCK I NEEDED THAT, sorry about the mess", update.Message.Chat.ID)
 					}
 				}()
 			}
