@@ -147,14 +147,16 @@ func getCommands(telebot TeleBot) []func(Update) {
 
 		// Traps command
 		func(update Update) {
-			if update.Message.Text == "/traps" {
+			matches, _ := getContentFromCommand(update.Message.Text, "traps")
+			if matches {
 				go telebot.SendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", update.Message.Chat.ID)
 			}
 		},
 
 		// God command
 		func(update Update) {
-			if update.Message.Text == "/gg" {
+			matches, _ := getContentFromCommand(update.Message.Text, "gg")
+			if matches {
 				go telebot.SendMessage("GOD IS GREAT", update.Message.Chat.ID)
 			}
 		},
@@ -231,6 +233,39 @@ func getCommands(telebot TeleBot) []func(Update) {
 				dc.DrawStringAnchored(commands, 500, 120, 0.0, 0.0)
 				dc.SavePNG("media/out.png")
 				telebot.sendImage("media/out.png", update.Message.Chat.ID)
+			}
+		},
+
+		func(update Update) {
+			matches, commands := getContentFromCommand(update.Message.Text, "valentines")
+			if matches && commands != "" {
+
+				if commands == "me" {
+					telebot.SendMessage("Stop trying to give yourself love", update.Message.Chat.ID)
+					return
+				}
+
+				im, err := gg.LoadPNG("murder/valentines.png")
+				if err != nil {
+					telebot.errorReport.Log("unable to load image: " + err.Error())
+					return
+				}
+				dc := gg.NewContextForImage(im)
+
+				dc.SetRGB(1, 1, 1)
+				font, err := truetype.Parse(goregular.TTF)
+				if err != nil {
+					telebot.errorReport.Log(err.Error())
+				}
+				face := truetype.NewFace(font, &truetype.Options{
+					Size: 19,
+				})
+
+				dc.SetFontFace(face)
+				dc.DrawStringAnchored(commands, 277, 175, 0.0, 0.0)
+				dc.DrawStringAnchored(update.Message.From.UserName, 297, 195, 0.0, 0.0)
+				dc.SavePNG("media/ValentineOut.png")
+				telebot.sendImage("media/ValentineOut.png", update.Message.Chat.ID)
 			}
 		},
 
