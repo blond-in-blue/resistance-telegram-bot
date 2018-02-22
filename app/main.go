@@ -50,6 +50,16 @@ func getCommands(telebot TeleBot) []func(Update) {
 			}
 		},
 
+		// Reactions
+		func(update Update) {
+			for key, value := range reactions {
+				matches, _ := getContentFromCommand(update.Message.Text, key)
+				if matches {
+					go telebot.SendMessage(value, update.Message.Chat.ID)
+				}
+			}
+		},
+
 		func(update Update) {
 			if update.Message.Text == "ahem" && update.Message.From.UserName == "B02s2" && update.Message.ReplyToMessage != nil {
 				go telebot.SendMessage("Actually, "+update.Message.ReplyToMessage.From.UserName+" is the furry", update.Message.Chat.ID)
