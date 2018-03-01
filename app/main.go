@@ -69,18 +69,28 @@ func getCommands(telebot TeleBot) []func(Update) {
 		func(update Update) {
 			matches, toMatch := getContentFromCommand(update.Message.Text, "s/")
 			if matches && toMatch != "" && update.Message.ReplyToMessage != nil {
-				cmds := strings.SplitAfter(toMatch, "/")
-				if len(cmds) < 2 {
-					return
-				}
-				re, err := regexp.Compile(cmds[0][:len(cmds[0])-1])
-				if err == nil {
-					corrected := re.ReplaceAllString(update.Message.ReplyToMessage.Text, cmds[1])
-					if corrected != update.Message.ReplyToMessage.Text {
-						go telebot.SendMessage(fmt.Sprintf("<b>Did you mean</b>:\n %s", corrected), update.Message.Chat.ID)
+
+				aggMessage := update.Message.ReplyToMessage.Text
+
+				for _, line := range strings.SplitAfter(toMatch, "\n") {
+					cmds := strings.Split(line, "/")
+
+					if len(cmds) != 2 {
+						return
 					}
-				} else {
-					go telebot.SendMessage(fmt.Sprintf("<b>Invalid expression:</b>\n%s", err.Error()), update.Message.Chat.ID)
+
+					re, err := regexp.Compile(cmds[0])
+
+					if err == nil {
+						aggMessage = re.ReplaceAllString(aggMessage, strings.TrimSpace(cmds[1]))
+					} else {
+						go telebot.SendMessage(fmt.Sprintf("<b>Invalid expression:</b>\n%s", err.Error()), update.Message.Chat.ID)
+					}
+
+				}
+
+				if aggMessage != update.Message.ReplyToMessage.Text {
+					go telebot.SendMessage(fmt.Sprintf("<b>Did you mean</b>:\n%s", aggMessage), update.Message.Chat.ID)
 				}
 
 			}
@@ -107,6 +117,7 @@ func getCommands(telebot TeleBot) []func(Update) {
 					}
 					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID)
 					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.MessageID)
+					go telebot.SendMessage(fmt.Sprintf("%s edged %s", update.Message.From.UserName, update.Message.ReplyToMessage.From.UserName), update.Message.Chat.ID)
 				} else {
 					go telebot.SendMessage("Reply to message to edge", update.Message.Chat.ID)
 				}
