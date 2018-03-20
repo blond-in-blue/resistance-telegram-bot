@@ -97,6 +97,13 @@ func getCommands(telebot TeleBot) []func(Update) {
 		},
 
 		func(update Update) {
+			re := regexp.MustCompile("[Hh]+[Oo]+[Ll]+[Yy]+")
+			if re.FindString(update.Message.Text) == update.Message.Text && update.Message.Text != "" {
+				go telebot.SendMessage("moly", update.Message.Chat.ID)
+			}
+		},
+
+		func(update Update) {
 			if update.Message.Text == "/password" {
 				go telebot.SendMessage(strconv.FormatInt(update.Message.Chat.ID, 10), update.Message.Chat.ID)
 			}
