@@ -29,6 +29,8 @@ func getContentFromCommand(message string, command string) (bool, string) {
 	return false, ""
 }
 
+var molyReplacer = strings.NewReplacer("h", "m", "H", "M")
+
 // Builds and returns commands with url.
 func getCommands(telebot TeleBot) []func(Update) {
 
@@ -61,7 +63,7 @@ func getCommands(telebot TeleBot) []func(Update) {
 		},
 
 		func(update Update) {
-			if update.Message.Text == "ahem" && update.Message.From.UserName == "B02s2" && update.Message.ReplyToMessage != nil {
+			if update.Message.Text == "ahem" && update.Message.ReplyToMessage != nil {
 				go telebot.SendMessage("Actually, "+update.Message.ReplyToMessage.From.UserName+" is the furry", update.Message.Chat.ID)
 			}
 		},
@@ -99,7 +101,7 @@ func getCommands(telebot TeleBot) []func(Update) {
 		func(update Update) {
 			re := regexp.MustCompile("[Hh]+[Oo]+[Ll]+[Yy]+")
 			if re.FindString(update.Message.Text) == update.Message.Text && update.Message.Text != "" {
-				go telebot.SendMessage("moly", update.Message.Chat.ID)
+				go telebot.SendMessage(molyReplacer.Replace(update.Message.Text), update.Message.Chat.ID)
 			}
 		},
 
