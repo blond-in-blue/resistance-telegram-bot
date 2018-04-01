@@ -23,22 +23,30 @@ type TeleBot struct {
 	url         string
 	chatBuffers map[string]MessageStack
 	chatAliases map[string]string
+	commands    []BotCommand
+	botResponses chan BotResponse
 	errorReport Report
 	redditUser  RedditAccount
 }
 
 // NewTelegramBot Creates a new telegram bot
-func NewTelegramBot(key string, errorReport Report, redditAccount RedditAccount) *TeleBot {
+func NewTelegramBot(key string, errorReport Report, redditAccount RedditAccount, commands []BotCommand) *TeleBot {
 	t := TeleBot{
+		botResponses: make(chan BotResponse),
+		chatAliases: make(map[string]string),
+		chatBuffers: make(map[string]MessageStack),
+		commands:    commands,
+		errorReport: errorReport,
 		key:         key,
 		lastUpdate:  0,
-		url:         fmt.Sprintf("https://api.telegram.org/bot%s/", key),
-		errorReport: errorReport,
-		chatBuffers: make(map[string]MessageStack),
-		chatAliases: make(map[string]string),
 		redditUser:  redditAccount,
+		url:         fmt.Sprintf("https://api.telegram.org/bot%s/", key),
 	}
 	return &t
+}
+
+func (telebot TeleBot) GetCommands() []BotCommand {
+	return telebot.commands
 }
 
 func (telebot TeleBot) IsAliasSet(alias string) (string, bool) {
@@ -89,7 +97,7 @@ func (telebot TeleBot) ChatBuffer(lookup string) MessageStack {
 }
 
 // SendMessage Resposible for sending a message to the appropriate group chat
-func (telebot TeleBot) SendMessage(message string, chatID int64) {
+func (telebot TeleBot) sendMessage(message string, chatID int64) {
 
 	postValues := map[string]string{
 		"chat_id":    strconv.FormatInt(chatID, 10),
@@ -285,4 +293,22 @@ func (telebot TeleBot) sendImage(path string, chatID int64) {
 		telebot.errorReport.Log(err.Error())
 	}
 	log.Println(string(bytes))
+}
+
+func (telebot TeleBot) Start() {
+	go func(){
+		for response := range telebot.botResponses {
+			if response.IsTextMessage() {
+				telebot.sendMessage(response.GetTextMessage(), response.GetChatID())
+			}
+		}
+	}()
+}
+
+func (telebot *TeleBot) OnMessage(update Update) {
+	for _, command := range telebot.commands {
+		if command.Matcher(update) {
+			command.Execute(*telebot, update, telebot.botResponses)
+		}
+	}
 }

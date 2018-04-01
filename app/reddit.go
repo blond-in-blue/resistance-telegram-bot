@@ -83,65 +83,88 @@ func LoginToReddit(username, password, useragent string) (RedditAccount, error) 
 	return RedditAccount{redditCookie, modhash}, nil
 }
 
-func rule34Search(term string, telebot TeleBot, update Update) {
+var rule34Command = BotCommand{
+	Name: "Rule34",
+	Description: "Search reddit's rule 34: /rule34 golang",
+	Matcher: messageContainsCommandMatcher("rule34"),
+	Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+		searchTerms := getContentFromCommand(update.Message.Text, "rule34")
 
-	submissions, err := telebot.redditUser.SearchSubreddit("rule34", term)
+		if searchTerms != "" {
+			submissions, err := bot.redditUser.SearchSubreddit("rule34", searchTerms)
 
-	if err != nil {
-		telebot.errorReport.Log("Error searching subreddit: " + err.Error())
-		telebot.SendMessage("Error searching subreddit", update.Message.Chat.ID)
-		return
-	}
+			if err != nil {
+				bot.errorReport.Log("Error searching subreddit: " + err.Error())
+				respChan <- *NewTextBotResponse("Error searching subreddit", update.Message.Chat.ID)
+			}
 
-	if len(submissions) > 0 {
-		telebot.SendMessage(submissions[0].Title+"\n"+submissions[0].URL, update.Message.Chat.ID)
-	} else {
-		telebot.SendMessage(fmt.Sprintf("Didn't find anything for '%s'", term), update.Message.Chat.ID)
-	}
-
+			if len(submissions) > 0 {
+				respChan <- *NewTextBotResponse(submissions[0].Title+"\n"+submissions[0].URL, update.Message.Chat.ID)
+			} else {
+				respChan <- *NewTextBotResponse(fmt.Sprintf("Didn't find anything for '%s'", searchTerms), update.Message.Chat.ID)
+			}
+		}
+	},
 }
 
-func hedgeHogCommand(term string, telebot TeleBot, update Update) {
 
-	submissions, err := telebot.redditUser.SearchSubreddit("thehedgehog", term)
+var hedgehogCommand = BotCommand{
+	Name: "Hedgehog",
+	Description: "Have you been hedgehogged? /hedgehog eli",
+	Matcher: messageContainsCommandMatcher("hedgehog"),
+	Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+		searchTerms := getContentFromCommand(update.Message.Text, "hedgehog")
 
-	if err != nil {
-		telebot.errorReport.Log("Error searching subreddit: " + err.Error())
-		telebot.SendMessage("Error searching", update.Message.Chat.ID)
-		return
-	}
+		if searchTerms != "" {
 
-	if len(submissions) > 0 {
-		telebot.SendMessage(submissions[0].URL, update.Message.Chat.ID)
-	} else {
-		telebot.SendMessage(fmt.Sprintf("'%s' has not been hedgehogged ", term), update.Message.Chat.ID)
-	}
+			submissions, err := bot.redditUser.SearchSubreddit("thehedgehog", searchTerms)
 
+			if err != nil {
+				bot.errorReport.Log("Error searching subreddit: " + err.Error())
+				respChan <- *NewTextBotResponse("Error searching subreddit", update.Message.Chat.ID)
+			}
+
+			if len(submissions) > 0 {
+				respChan <- *NewTextBotResponse(submissions[0].Title+"\n"+submissions[0].URL, update.Message.Chat.ID)
+			} else {
+				respChan <- *NewTextBotResponse(fmt.Sprintf("'%s' has not been hedgehogged ", searchTerms), update.Message.Chat.ID)
+			}
+		}
+	},
 }
 
-// SaveCommand posts to our subreddit
-func SaveCommand(term string, telebot TeleBot, update Update) {
+var saveCommand = BotCommand{
+	Name: "Save",
+	Description: "Save a text post to the subreddit",
+	Matcher: messageContainsCommandMatcher("save"),
+	Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+		term := getContentFromCommand(update.Message.Text, "save")
 
-	if update.Message.ReplyToMessage == nil {
-		telebot.SendMessage("Reply to a message and say save to save to the subreddit", update.Message.Chat.ID)
-		return
-	}
+		if term == "" {
+			respChan <- *NewTextBotResponse("Please provide a title for the post", update.Message.Chat.ID)
+			return
+		}
 
-	if update.Message.ReplyToMessage.Text == "" {
-		telebot.SendMessage("I can only save text, give me some text or open up a feature branch", update.Message.Chat.ID)
-		return
-	}
-
-	//log.Println("Going to save... " + term)
-	log.Printf("update: %s", update.Message.ReplyToMessage.Text)
-
-	info, err := telebot.redditUser.PostToSubreddit(fmt.Sprintf("%s:\n\n%s", update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.Text), term, "smartestretards")
-	if err != nil {
-		telebot.errorReport.Log("Unable to post to reddit: " + err.Error())
-		telebot.SendMessage("Unable to post to reddit", update.Message.Chat.ID)
-	} else {
-		telebot.SendMessage(info, update.Message.Chat.ID)
-	}
+		if update.Message.ReplyToMessage == nil {
+			respChan <- *NewTextBotResponse("Reply to a message and say save to save to the subreddit", update.Message.Chat.ID)
+			return
+		}
+	
+		if update.Message.ReplyToMessage.Text == "" {
+			respChan <- *NewTextBotResponse("I can only save text, give me some text or open up a feature branch", update.Message.Chat.ID)
+			return
+		}
+	
+		log.Printf("update: %s", update.Message.ReplyToMessage.Text)
+	
+		info, err := bot.redditUser.PostToSubreddit(fmt.Sprintf("%s:\n\n%s", update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.Text), term, "smartestretards")
+		if err != nil {
+			bot.errorReport.Log("Unable to post to reddit: " + err.Error())
+			respChan <- *NewTextBotResponse("Unable to post to reddit", update.Message.Chat.ID)
+		} else {
+			respChan <- *NewTextBotResponse(info, update.Message.Chat.ID)
+		}
+	},
 }
 
 func (r RedditAccount) PostToSubreddit(textPost string, title string, subreddit string) (string, error) {

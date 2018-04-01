@@ -4,53 +4,184 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"log"
-	"math/rand"
+	// "math/rand"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/fogleman/gg"
+	// "github.com/fogleman/gg"
 	"github.com/gin-gonic/gin"
-	"github.com/golang/freetype/truetype"
-	"golang.org/x/image/font/gofont/goregular"
+	// "github.com/golang/freetype/truetype"
+	// "golang.org/x/image/font/gofont/goregular"
 )
 
-func getContentFromCommand(message string, command string) (bool, string) {
-	commands := strings.SplitAfter(message, fmt.Sprintf("/%s", command))
-	if len(commands) > 1 {
-		return true, strings.TrimSpace(commands[1])
+func messageContainsCommandMatcher(command string) (func(Update) bool) {
+	return func(update Update) bool{
+		return messageContainsCommand(update.Message.Text, command)
 	}
-	return false, ""
 }
 
-var molyReplacer = strings.NewReplacer("h", "m", "H", "M")
+func messageContainsCommand(message string, command string) bool{
+	return len(strings.SplitAfter(message, fmt.Sprintf("/%s", command))) > 1
+}
 
-// Builds and returns commands with url.
-func getCommands(telebot TeleBot) []func(Update) {
+func getContentFromCommand(message string, command string) string {
+	commands := strings.SplitAfter(message, fmt.Sprintf("/%s", command))
+	if len(commands) > 1 {
+		return strings.TrimSpace(commands[1])
+	}
+	return ""
+}
 
-	return []func(update Update){
 
-		// alias command
-		func(update Update) {
-			matches, alias := getContentFromCommand(update.Message.Text, "alias-set")
-			if matches && alias != "" {
+// Builds and returns commands
+func getCommands() []BotCommand {
 
-				_, alreadyExists := telebot.IsAliasSet(alias)
-				if alreadyExists {
-					go telebot.SendMessage(fmt.Sprintf("Someone has already taken the alias '%s'", alias), update.Message.Chat.ID)
-				} else {
-					telebot.SetChatAlias(alias, update.Message.Chat.ID)
-					go telebot.SendMessage(fmt.Sprintf("Alias set as: '%s'", alias), update.Message.Chat.ID)
+	return []BotCommand {
+
+		BotCommand{
+			Name: "Help",
+			Description: "list of commands",
+			Matcher: messageContainsCommandMatcher("help"),
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				var returnMsg bytes.Buffer
+				returnMsg.WriteString("COMMANDS\n ")
+				for _, command := range bot.GetCommands() {
+					returnMsg.WriteString(fmt.Sprintf("\n<b>%s</b> - %s\n", command.Name, command.Description))
+				}
+				respChan <- *NewTextBotResponse(returnMsg.String(), update.Message.Chat.ID)
+			},
+		},
+
+		BotCommand{
+			Name: "traps",
+			Description: "just a friendly reminder",
+			Matcher: messageContainsCommandMatcher("traps"),
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				respChan <- *NewTextBotResponse("https://www.youtube.com/watch?v=9E1YYSZ9qrk", update.Message.Chat.ID)
+			},
+		},
+
+		BotCommand{
+			Name: "ping",
+			Description: "check if the bot is listenting",
+			Matcher: messageContainsCommandMatcher("ping"),
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				respChan <- *NewTextBotResponse("fuck you want?", update.Message.Chat.ID)
+			},
+		},
+
+		BotCommand{
+			Name: "Alias Set",
+			Description: "Alias the chat for other commands like edge, <code>/alias-set resistance</code>",
+			Matcher: messageContainsCommandMatcher("alias-set"),
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				alias := getContentFromCommand(update.Message.Text, "alias-set")
+
+				if alias != "" {
+					_, alreadyExists := bot.IsAliasSet(alias)
+					if alreadyExists {
+						respChan <- *NewTextBotResponse(fmt.Sprintf("Someone has already taken the alias '%s'", alias), update.Message.Chat.ID)
+					} else {
+						bot.SetChatAlias(alias, update.Message.Chat.ID)
+						respChan <- *NewTextBotResponse(fmt.Sprintf("Alias set as: '%s'", alias), update.Message.Chat.ID)
+					}
+				}
+			},
+		},
+
+		BotCommand{
+			Name: "Password",
+			Description: "Gives you chat id for edged site, /password",
+			Matcher: messageContainsCommandMatcher("password"),
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				respChan <- *NewTextBotResponse(strconv.FormatInt(update.Message.Chat.ID, 10), update.Message.Chat.ID)
+			},
+		},
+
+		BotCommand{
+			Name: "Leaving",
+			Description: "Cause you want more attention, /leaving",
+			Matcher: messageContainsCommandMatcher("leaving"),
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				respChan <- *NewTextBotResponse("Y’all are miserable people who demand to be right at all times, even when you have no experience on the subject. I’m sick of it and it’s gonna be better to just not have to deal with it. So I’m out. You’re mostly all hugely negative impacts on mine and others’ lives. Obviously some of you I still consider friends, but it’s really gotten to where the animosity of a few people make this little group irredeemably shitty for me to be a part of. Or irredeemably shitty in general really. There’s really just no good part of Resistance. ", update.Message.Chat.ID)
+				respChan <- *NewTextBotResponse("Especially when it’s pretty much exclusively me that seems to be the target of all the hate. It just feels super mean spirited. It would be different if you attacked everybody the same way, but you don’t. And don’t even try to fucking pretend you do. I’ve genuinely never felt liked here. ", update.Message.Chat.ID)
+			},
+		},
+
+		BotCommand{
+			Name: "Edge",
+			Description: "Hide messages for later, reply to a message with /edge",
+			Matcher: func(update Update) bool {
+				return update.Message.ReplyToMessage != nil && update.Message.Text == "/edge" 
+			},
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				bot.PushMessageToChatBuffer(strconv.FormatInt(update.Message.Chat.ID, 10), *update.Message.ReplyToMessage)
+				if update.Message.ReplyToMessage.Photo != nil {
+					photos := *update.Message.ReplyToMessage.Photo
+					go bot.GetImage(photos[0].FileID)
+				}
+				if update.Message.ReplyToMessage.Sticker != nil {
+					sticker := *update.Message.ReplyToMessage.Sticker
+					go bot.GetImage(sticker.FileID)
+				}
+				go bot.deleteMessage(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID)
+				go bot.deleteMessage(update.Message.Chat.ID, update.Message.MessageID)
+				respChan <- *NewTextBotResponse(fmt.Sprintf("%s edged %s", update.Message.From.UserName, update.Message.ReplyToMessage.From.UserName), update.Message.Chat.ID)
+			},
+		},
+
+		BotCommand{
+			Name: "Ejaculate",
+			Description: "Release all the messages that have been edged with /ejaculate",
+			Matcher: func(update Update) bool {
+				return update.Message.Text == "/ejaculate" 
+			},
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				msgSentCount := 0
+				for msg := range bot.ClearBuffer(update.Message.Chat.ID) {
+					msgSentCount += 1
+					if msg.Photo != nil {
+						photos := *msg.Photo
+						respChan <- *NewTextBotResponse(msg.From.UserName+" sent:", update.Message.Chat.ID)
+						respChan <- *NewTextBotResponse(photos[0].FileID, update.Message.Chat.ID)
+					} else if msg.Sticker != nil {
+						respChan <- *NewTextBotResponse(msg.From.UserName+" sent:", update.Message.Chat.ID)
+						respChan <- *NewTextBotResponse(msg.Sticker.FileID, update.Message.Chat.ID)
+					} else {
+						respChan <- *NewTextBotResponse(fmt.Sprintf("%s sent:\n%s", msg.From.UserName, msg.Text), update.Message.Chat.ID)
+					}
 				}
 
-			}
+				if msgSentCount == 0 {
+					respChan <- *NewTextBotResponse("I'm not usually like this. Maybe if you do something sexy it'll start working", update.Message.Chat.ID)
+				} else if msgSentCount < 5 {
+					respChan <- *NewTextBotResponse("Normally I'm not that quick", update.Message.Chat.ID)
+				} else if msgSentCount < 10 {
+					respChan <- *NewTextBotResponse("I need a ciggarette after that", update.Message.Chat.ID)
+				} else {
+					respChan <- *NewTextBotResponse("HOLY FUCK I NEEDED THAT, sorry about the mess", update.Message.Chat.ID)
+				}
+			},
 		},
+
+		holyCommand,
+		killCommand,
+		rule34Command,
+		hedgehogCommand,
+		saveCommand,
+		pokedexCommand,
+
+
+	}
+	/*
+	return []func(){
 
 		// Reactions
 		func(update Update) {
@@ -59,12 +190,6 @@ func getCommands(telebot TeleBot) []func(Update) {
 				if matches {
 					go telebot.SendMessage(value, update.Message.Chat.ID)
 				}
-			}
-		},
-
-		func(update Update) {
-			if update.Message.Text == "ahem" && update.Message.ReplyToMessage != nil {
-				go telebot.SendMessage("Actually, "+update.Message.ReplyToMessage.From.UserName+" is the furry", update.Message.Chat.ID)
 			}
 		},
 
@@ -99,143 +224,6 @@ func getCommands(telebot TeleBot) []func(Update) {
 		},
 
 		func(update Update) {
-			re := regexp.MustCompile("[Hh]+[Oo]+[Ll]+[Yy]+")
-			if re.FindString(update.Message.Text) == update.Message.Text && update.Message.Text != "" {
-				go telebot.SendMessage(molyReplacer.Replace(update.Message.Text), update.Message.Chat.ID)
-			}
-		},
-
-		func(update Update) {
-			if update.Message.Text == "/password" {
-				go telebot.SendMessage(strconv.FormatInt(update.Message.Chat.ID, 10), update.Message.Chat.ID)
-			}
-		},
-
-		func(update Update) {
-			matches, otherChatID := getContentFromCommand(update.Message.Text, "edge")
-			if matches {
-				if update.Message.ReplyToMessage != nil {
-					telebot.PushMessageToChatBuffer(otherChatID, *update.Message.ReplyToMessage)
-					if update.Message.ReplyToMessage.Photo != nil {
-						photos := *update.Message.ReplyToMessage.Photo
-						go telebot.GetImage(photos[0].FileID)
-					}
-					if update.Message.ReplyToMessage.Sticker != nil {
-						sticker := *update.Message.ReplyToMessage.Sticker
-						go telebot.GetImage(sticker.FileID)
-					}
-					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID)
-					go telebot.deleteMessage(update.Message.Chat.ID, update.Message.MessageID)
-					go telebot.SendMessage(fmt.Sprintf("%s edged %s", update.Message.From.UserName, update.Message.ReplyToMessage.From.UserName), update.Message.Chat.ID)
-				} else {
-					go telebot.SendMessage("Reply to message to edge", update.Message.Chat.ID)
-				}
-
-			}
-		},
-
-		func(update Update) {
-			matches, _ := getContentFromCommand(update.Message.Text, "ejaculate")
-			if matches {
-				go func() {
-					msgSentCount := 0
-					for msg := range telebot.ClearBuffer(update.Message.Chat.ID) {
-						msgSentCount += 1
-						if msg.Photo != nil {
-							photos := *msg.Photo
-							telebot.SendMessage(msg.From.UserName+" sent:", update.Message.Chat.ID)
-							telebot.SendPhotoByID(photos[0].FileID, update.Message.Chat.ID)
-						} else if msg.Sticker != nil {
-							telebot.SendMessage(msg.From.UserName+" sent:", update.Message.Chat.ID)
-							telebot.SendSticker(msg.Sticker.FileID, update.Message.Chat.ID)
-						} else {
-							telebot.SendMessage(fmt.Sprintf("%s sent:\n%s", msg.From.UserName, msg.Text), update.Message.Chat.ID)
-						}
-					}
-
-					if msgSentCount == 0 {
-						telebot.SendMessage("I'm not usually like this. Maybe if you do something sexy it'll start working", update.Message.Chat.ID)
-					} else if msgSentCount < 5 {
-						telebot.SendMessage("Normally I'm not that quick", update.Message.Chat.ID)
-					} else if msgSentCount < 10 {
-						telebot.SendMessage("I need a ciggarette after that", update.Message.Chat.ID)
-					} else {
-						telebot.SendMessage("HOLY FUCK I NEEDED THAT, sorry about the mess", update.Message.Chat.ID)
-					}
-				}()
-			}
-		},
-
-		// Kill command
-		func(update Update) {
-			matches, commands := getContentFromCommand(update.Message.Text, "kill")
-			if matches && commands != "" {
-				n := rand.Int() % len(killStatements)
-				go telebot.SendMessage(commands+killStatements[n], update.Message.Chat.ID)
-			}
-		},
-
-		// Traps command
-		func(update Update) {
-			matches, _ := getContentFromCommand(update.Message.Text, "traps")
-			if matches {
-				go telebot.SendMessage("https://www.youtube.com/watch?v=9E1YYSZ9qrk", update.Message.Chat.ID)
-			}
-		},
-
-		// God command
-		func(update Update) {
-			matches, _ := getContentFromCommand(update.Message.Text, "gg")
-			if matches {
-				go telebot.SendMessage("GOD IS GREAT", update.Message.Chat.ID)
-			}
-		},
-
-		// Rule34 command
-		func(update Update) {
-			matches, commands := getContentFromCommand(update.Message.Text, "rule34")
-			if matches && commands != "" {
-				go rule34Search(commands, telebot, update)
-			}
-		},
-
-		// Hedgehog
-		func(update Update) {
-			matches, commands := getContentFromCommand(update.Message.Text, "hedgehog")
-			if matches && commands != "" {
-				go hedgeHogCommand(commands, telebot, update)
-			}
-		},
-
-		// Ping
-		func(update Update) {
-			if update.Message.Text == "/ping" {
-				go telebot.SendMessage("fuck u want", update.Message.Chat.ID)
-			}
-		},
-
-		// Save command
-		func(update Update) {
-			matches, commands := getContentFromCommand(update.Message.Text, "save")
-			if matches {
-				if commands != "" {
-					go SaveCommand(commands, telebot, update)
-				} else {
-					go telebot.SendMessage("Please provide a title for the post.", update.Message.Chat.ID)
-				}
-
-			}
-		},
-
-		//pokedexSerach
-		func(update Update) {
-			matches, commands := getContentFromCommand(update.Message.Text, "pokedex")
-			if matches && commands != "" {
-				go pokedexSearch(commands, telebot, update)
-			}
-		},
-
-		func(update Update) {
 			matches, commands := getContentFromCommand(update.Message.Text, "murder")
 			if matches && commands != "" {
 
@@ -265,40 +253,6 @@ func getCommands(telebot TeleBot) []func(Update) {
 				telebot.sendImage("media/out.png", update.Message.Chat.ID)
 			}
 		},
-
-		func(update Update) {
-			matches, commands := getContentFromCommand(update.Message.Text, "valentines")
-			if matches && commands != "" {
-
-				if commands == "me" {
-					telebot.SendMessage("Stop trying to give yourself love", update.Message.Chat.ID)
-					return
-				}
-
-				im, err := gg.LoadPNG("murder/valentines.png")
-				if err != nil {
-					telebot.errorReport.Log("unable to load image: " + err.Error())
-					return
-				}
-				dc := gg.NewContextForImage(im)
-
-				dc.SetRGB(1, 1, 1)
-				font, err := truetype.Parse(goregular.TTF)
-				if err != nil {
-					telebot.errorReport.Log(err.Error())
-				}
-				face := truetype.NewFace(font, &truetype.Options{
-					Size: 19,
-				})
-
-				dc.SetFontFace(face)
-				dc.DrawStringAnchored(commands, 277, 175, 0.0, 0.0)
-				dc.DrawStringAnchored(update.Message.From.UserName, 297, 195, 0.0, 0.0)
-				dc.SavePNG("media/ValentineOut.png")
-				telebot.sendImage("media/ValentineOut.png", update.Message.Chat.ID)
-			}
-		},
-
 		func(update Update) {
 			matches, commands := getContentFromCommand(update.Message.Text, "fight")
 			if matches && commands != "" {
@@ -392,6 +346,7 @@ func getCommands(telebot TeleBot) []func(Update) {
 
 		},
 	}
+	*/
 }
 
 // Create our routes
@@ -439,8 +394,6 @@ func initRoutes(router *gin.Engine, telebot TeleBot) {
 
 func listenForUpdates(telebot TeleBot) {
 
-	commands := getCommands(telebot)
-
 	for {
 		// Sleep first, so if we error out and continue to the next loop, we still end up waiting
 		time.Sleep(time.Second)
@@ -456,9 +409,7 @@ func listenForUpdates(telebot TeleBot) {
 		for _, update := range updates {
 			if update.Message != nil {
 				log.Println(update.Message.ToString())
-				for _, command := range commands {
-					command(update)
-				}
+				telebot.OnMessage(update)
 			}
 		}
 
@@ -494,7 +445,8 @@ func main() {
 
 	errorReport := NewReport()
 	redditUser := logginToReddit(*errorReport)
-	teleBot := NewTelegramBot(os.Getenv("TELE_KEY"), *errorReport, redditUser)
+	teleBot := NewTelegramBot(os.Getenv("TELE_KEY"), *errorReport, redditUser, getCommands())
+	teleBot.Start()
 
 	go listenForUpdates(*teleBot)
 

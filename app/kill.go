@@ -1,5 +1,9 @@
 package main
 
+import (
+	"math/rand"
+)
+
 var killStatements = []string{
 	" teabagged a piranha tank",
 	" died of a heart attack while watching hentai",
@@ -33,4 +37,16 @@ var killStatements = []string{
 	" opened Resistance after 5 PM",
 	" choked on a Tide Pod",
 	" is handing out with Logan Paul",
+}
+
+var killCommand = BotCommand{
+	Name: "kill",
+	Description: "insult someone, /kill my 8am",
+	Matcher: messageContainsCommandMatcher("kill"),
+	Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+		commands := getContentFromCommand(update.Message.Text, "kill")
+		if commands != "" {
+			respChan <- *NewTextBotResponse(commands+killStatements[rand.Int() % len(killStatements)], update.Message.Chat.ID)
+		}
+	},
 }
