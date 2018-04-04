@@ -150,10 +150,10 @@ func getCommands() []BotCommand {
 					if msg.Photo != nil {
 						photos := *msg.Photo
 						respChan <- *NewTextBotResponse(msg.From.UserName+" sent:", update.Message.Chat.ID)
-						respChan <- *NewTextBotResponse(photos[0].FileID, update.Message.Chat.ID)
+						respChan <- *NewPictureBotResponse(photos[0].FileID, update.Message.Chat.ID)
 					} else if msg.Sticker != nil {
 						respChan <- *NewTextBotResponse(msg.From.UserName+" sent:", update.Message.Chat.ID)
-						respChan <- *NewTextBotResponse(msg.Sticker.FileID, update.Message.Chat.ID)
+						respChan <- *NewStickerBotResponse(msg.Sticker.FileID, update.Message.Chat.ID)
 					} else {
 						respChan <- *NewTextBotResponse(fmt.Sprintf("%s sent:\n%s", msg.From.UserName, msg.Text), update.Message.Chat.ID)
 					}

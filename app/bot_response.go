@@ -16,25 +16,43 @@ func (res BotResponse) IsTextMessage() bool {
 	return res.Text != ""
 }
 
+func (res BotResponse) IsPicture() bool {
+	return res.Pid != ""
+}
+
+func (res BotResponse) IsSticker() bool {
+	return res.Sid != ""
+}
+
 func (res BotResponse) GetTextMessage() string {
 	return res.Text
 }
 
-func  NewTextBotResponse(msg string, chatID int64) *BotResponse{
+func (res BotResponse) GetPicture() string {
+	return res.Pid
+}
+
+func (res BotResponse) GetSticker() string {
+	return res.Sid
+}
+
+func NewTextBotResponse(msg string, chatID int64) *BotResponse{
 	p := new(BotResponse)
 	p.Text = msg
 	p.ChatID = chatID
     return p
 }
 
-func  NewPictureBotResponse(pid string) *BotResponse{
+func NewPictureBotResponse(pid string, chatID int64) *BotResponse{
 	p := new(BotResponse)
     p.Pid = pid
+	p.ChatID = chatID
     return p
 }
 
-func  NewStickerBotResponse(sid string) *BotResponse{
+func NewStickerBotResponse(sid string, chatID int64) *BotResponse{
 	p := new(BotResponse)
     p.Sid = sid
+	p.ChatID = chatID
     return p
 }

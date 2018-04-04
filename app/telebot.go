@@ -301,6 +301,15 @@ func (telebot TeleBot) Start() {
 			if response.IsTextMessage() {
 				telebot.sendMessage(response.GetTextMessage(), response.GetChatID())
 			}
+			if response.IsSticker() {
+				log.Println("Sticker")
+				telebot.SendSticker(response.GetSticker(), response.GetChatID())
+				log.Println(response.GetSticker())
+			}
+			if response.IsPicture() {
+				log.Println("Picture")
+				telebot.SendPhotoByID(response.GetPicture(), response.GetChatID())
+			}
 		}
 	}()
 }
@@ -308,7 +317,7 @@ func (telebot TeleBot) Start() {
 func (telebot *TeleBot) OnMessage(update Update) {
 	for _, command := range telebot.commands {
 		if command.Matcher(update) {
-			command.Execute(*telebot, update, telebot.botResponses)
+			go command.Execute(*telebot, update, telebot.botResponses)
 		}
 	}
 }
