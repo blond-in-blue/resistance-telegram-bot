@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -84,9 +85,9 @@ func LoginToReddit(username, password, useragent string) (RedditAccount, error) 
 }
 
 var rule34Command = BotCommand{
-	Name: "Rule34",
+	Name:        "Rule34",
 	Description: "Search reddit's rule 34: /rule34 golang",
-	Matcher: messageContainsCommandMatcher("rule34"),
+	Matcher:     messageContainsCommandMatcher("rule34"),
 	Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
 		searchTerms := getContentFromCommand(update.Message.Text, "rule34")
 
@@ -107,11 +108,10 @@ var rule34Command = BotCommand{
 	},
 }
 
-
 var hedgehogCommand = BotCommand{
-	Name: "Hedgehog",
+	Name:        "Hedgehog",
 	Description: "Have you been hedgehogged? /hedgehog eli",
-	Matcher: messageContainsCommandMatcher("hedgehog"),
+	Matcher:     messageContainsCommandMatcher("hedgehog"),
 	Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
 		searchTerms := getContentFromCommand(update.Message.Text, "hedgehog")
 
@@ -133,10 +133,12 @@ var hedgehogCommand = BotCommand{
 	},
 }
 
+var urlRegex = regexp.MustCompile(`(http|ftp|https)://([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?`)
+
 var saveCommand = BotCommand{
-	Name: "Save",
+	Name:        "Save",
 	Description: "Save a text post to the subreddit",
-	Matcher: messageContainsCommandMatcher("save"),
+	Matcher:     messageContainsCommandMatcher("save"),
 	Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
 		term := getContentFromCommand(update.Message.Text, "save")
 
@@ -149,15 +151,20 @@ var saveCommand = BotCommand{
 			respChan <- *NewTextBotResponse("Reply to a message and say save to save to the subreddit", update.Message.Chat.ID)
 			return
 		}
-	
+
 		if update.Message.ReplyToMessage.Text == "" {
-			respChan <- *NewTextBotResponse("I can only save text, give me some text or open up a feature branch", update.Message.Chat.ID)
+			respChan <- *NewTextBotResponse("I can only save text and links, saving photos are fucky thanks to telegram api", update.Message.Chat.ID)
 			return
 		}
-	
-		log.Printf("update: %s", update.Message.ReplyToMessage.Text)
-	
-		info, err := bot.redditUser.PostToSubreddit(fmt.Sprintf("%s:\n\n%s", update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.Text), term, "smartestretards")
+
+		var post string
+		if urlRegex.FindString(update.Message.ReplyToMessage.Text) == update.Message.ReplyToMessage.Text {
+			post = update.Message.ReplyToMessage.Text
+		} else {
+			post = fmt.Sprintf("%s:\n\n%s", update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.Text)
+		}
+
+		info, err := bot.redditUser.PostToSubreddit(post, term, "smartestretards")
 		if err != nil {
 			bot.errorReport.Log("Unable to post to reddit: " + err.Error())
 			respChan <- *NewTextBotResponse("Unable to post to reddit", update.Message.Chat.ID)
@@ -168,13 +175,21 @@ var saveCommand = BotCommand{
 }
 
 func (r RedditAccount) PostToSubreddit(textPost string, title string, subreddit string) (string, error) {
+
+	var kind string
+	if urlRegex.FindString(textPost) == textPost {
+		kind = "link"
+	} else {
+		kind = "self"
+	}
+
 	// Create a request to be sent to reddit
 	vals := &url.Values{
 		"title":       {title},
 		"url":         {textPost},
 		"text":        {textPost},
 		"sr":          {subreddit},
-		"kind":        {"self"},
+		"kind":        {kind},
 		"sendreplies": {"true"},
 		"resubmit":    {"true"},
 		"extension":   {"json"},

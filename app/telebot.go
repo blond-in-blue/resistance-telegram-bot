@@ -18,29 +18,29 @@ import (
 
 // TeleBot talks to telegram and manages application state
 type TeleBot struct {
-	key         string
-	lastUpdate  int
-	url         string
-	chatBuffers map[string]MessageStack
-	chatAliases map[string]string
-	commands    []BotCommand
+	key          string
+	lastUpdate   int
+	url          string
+	chatBuffers  map[string]MessageStack
+	chatAliases  map[string]string
+	commands     []BotCommand
 	botResponses chan BotResponse
-	errorReport Report
-	redditUser  RedditAccount
+	errorReport  Report
+	redditUser   RedditAccount
 }
 
 // NewTelegramBot Creates a new telegram bot
 func NewTelegramBot(key string, errorReport Report, redditAccount RedditAccount, commands []BotCommand) *TeleBot {
 	t := TeleBot{
 		botResponses: make(chan BotResponse),
-		chatAliases: make(map[string]string),
-		chatBuffers: make(map[string]MessageStack),
-		commands:    commands,
-		errorReport: errorReport,
-		key:         key,
-		lastUpdate:  0,
-		redditUser:  redditAccount,
-		url:         fmt.Sprintf("https://api.telegram.org/bot%s/", key),
+		chatAliases:  make(map[string]string),
+		chatBuffers:  make(map[string]MessageStack),
+		commands:     commands,
+		errorReport:  errorReport,
+		key:          key,
+		lastUpdate:   0,
+		redditUser:   redditAccount,
+		url:          fmt.Sprintf("https://api.telegram.org/bot%s/", key),
 	}
 	return &t
 }
@@ -197,6 +197,8 @@ func (telebot TeleBot) GetImage(fileID string) (string, error) {
 		return "", errors.New("telegram resolved unsucessfully")
 	}
 
+	log.Println(fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", telebot.key, imageResponse.Result.FilePath))
+
 	resp, err = http.Get(fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", telebot.key, imageResponse.Result.FilePath))
 
 	if err != nil {
@@ -296,7 +298,7 @@ func (telebot TeleBot) sendImage(path string, chatID int64) {
 }
 
 func (telebot TeleBot) Start() {
-	go func(){
+	go func() {
 		for response := range telebot.botResponses {
 			if response.IsTextMessage() {
 				telebot.sendMessage(response.GetTextMessage(), response.GetChatID())
