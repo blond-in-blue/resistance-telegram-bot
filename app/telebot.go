@@ -249,6 +249,55 @@ func (telebot TeleBot) SendSticker(fileID string, chatID int64) error {
 	return err
 }
 
+func (telebot TeleBot) sendFile(path string, chatID int64) {
+	var b bytes.Buffer
+	var err error
+	w := multipart.NewWriter(&b)
+	var fw io.Writer
+
+	w.WriteField("chat_id", strconv.FormatInt(chatID, 10))
+	file, err := os.Open(path)
+	if err != nil {
+		log.Println(err)
+		telebot.errorReport.Log(err.Error())
+	}
+	defer file.Close()
+
+	if fw, err = w.CreateFormFile("document", "movie.gif"); err != nil {
+		telebot.errorReport.Log(err.Error())
+	}
+
+	_, err = io.Copy(fw, file)
+	if err != nil {
+		log.Println(err)
+	}
+
+	w.CreateFormField("something")
+
+	w.Close()
+
+	req, err := http.NewRequest("POST", telebot.url+"sendDocument", &b)
+	if err != nil {
+		telebot.errorReport.Log(err.Error())
+	}
+
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	client := &http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		log.Println(err)
+		telebot.errorReport.Log(err.Error())
+	}
+
+	bytes, err := ioutil.ReadAll(res.Body)
+
+	if err != nil {
+		log.Println(err)
+		telebot.errorReport.Log(err.Error())
+	}
+	log.Println(string(bytes))
+}
+
 func (telebot TeleBot) sendImage(path string, chatID int64) {
 	var b bytes.Buffer
 	var err error
@@ -311,6 +360,10 @@ func (telebot TeleBot) Start() {
 			if response.IsPicture() {
 				log.Println("Picture")
 				telebot.SendPhotoByID(response.GetPicture(), response.GetChatID())
+			}
+			if response.IsFile() {
+				log.Println("File")
+				telebot.sendFile(response.GetFilePath(), response.GetChatID())
 			}
 		}
 	}()

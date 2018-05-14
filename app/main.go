@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	// "github.com/fogleman/gg"
+	"github.com/fogleman/gg"
 	"github.com/gin-gonic/gin"
-	// "github.com/golang/freetype/truetype"
-	// "golang.org/x/image/font/gofont/goregular"
+	"github.com/golang/freetype/truetype"
+	"golang.org/x/image/font/gofont/goregular"
 )
 
 func messageContainsCommandMatcher(command string) func(Update) bool {
@@ -169,6 +169,66 @@ func getCommands() []BotCommand {
 				} else {
 					respChan <- *NewTextBotResponse("HOLY FUCK I NEEDED THAT, sorry about the mess", update.Message.Chat.ID)
 				}
+			},
+		},
+
+		BotCommand{
+			Name:        "Rush",
+			Description: "Obliterate your opponent",
+			Matcher:     messageContainsCommandMatcher("rush"),
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				wholeCommand := getContentFromCommand(update.Message.Text, "rush")
+
+				if wholeCommand == "" {
+					return
+				}
+				commands := strings.Split(wholeCommand, " with ")
+
+				name := commands[0]
+				attack := ""
+
+				if len(commands) > 1 {
+					attack = commands[1]
+				}
+				font, err := truetype.Parse(goregular.TTF)
+				if err != nil {
+					bot.errorReport.Log(err.Error())
+				}
+				face := truetype.NewFace(font, &truetype.Options{
+					Size: 70,
+				})
+
+				for i := 0; i < 4; i++ {
+					im, err := gg.LoadPNG(fmt.Sprintf("trunks2/F_00%d.png", i))
+					if err != nil {
+						bot.errorReport.Log("unable to load image: " + err.Error())
+						return
+					}
+					dc := gg.NewContextForImage(im)
+					dc.SetRGB(1, 1, 1)
+					dc.SetFontFace(face)
+					dc.DrawStringAnchored(update.Message.From.UserName, 950, 120, 0.0, 0.0)
+					dc.DrawStringAnchored(name, 750, 600, 0.0, 0.0)
+					dc.SavePNG(fmt.Sprintf("trunks2out/F_00%d.png", i))
+				}
+
+				if attack != "" {
+					for i := 34; i < 42; i++ {
+						im, err := gg.LoadPNG(fmt.Sprintf("trunks2/F_0%d.png", i))
+						if err != nil {
+							bot.errorReport.Log("unable to load image: " + err.Error())
+							return
+						}
+						dc := gg.NewContextForImage(im)
+						dc.SetRGB(1, 0, 0)
+						dc.SetFontFace(face)
+						dc.DrawStringAnchored(attack, 250, 300, 0.0, 0.0)
+						dc.SavePNG(fmt.Sprintf("trunks2out/F_0%d.png", i))
+					}
+				}
+
+				StichPicturesTogether("trunks2out")
+				respChan <- *NewFileBotResponse("movie.gif", update.Message.Chat.ID)
 			},
 		},
 

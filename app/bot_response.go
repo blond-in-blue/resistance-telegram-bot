@@ -2,10 +2,11 @@ package main
 
 // BotResponse set by bot when a command is satisfied
 type BotResponse struct {
-	Text string
-	Pid string
-	Sid string
-	ChatID int64
+	Text     string
+	Pid      string
+	Sid      string
+	FilePath string
+	ChatID   int64
 }
 
 func (res BotResponse) GetChatID() int64 {
@@ -24,6 +25,10 @@ func (res BotResponse) IsSticker() bool {
 	return res.Sid != ""
 }
 
+func (res BotResponse) IsFile() bool {
+	return res.FilePath != ""
+}
+
 func (res BotResponse) GetTextMessage() string {
 	return res.Text
 }
@@ -36,23 +41,34 @@ func (res BotResponse) GetSticker() string {
 	return res.Sid
 }
 
-func NewTextBotResponse(msg string, chatID int64) *BotResponse{
+func (res BotResponse) GetFilePath() string {
+	return res.FilePath
+}
+
+func NewTextBotResponse(msg string, chatID int64) *BotResponse {
 	p := new(BotResponse)
 	p.Text = msg
 	p.ChatID = chatID
-    return p
+	return p
 }
 
-func NewPictureBotResponse(pid string, chatID int64) *BotResponse{
+func NewPictureBotResponse(pid string, chatID int64) *BotResponse {
 	p := new(BotResponse)
-    p.Pid = pid
+	p.Pid = pid
 	p.ChatID = chatID
-    return p
+	return p
 }
 
-func NewStickerBotResponse(sid string, chatID int64) *BotResponse{
+func NewStickerBotResponse(sid string, chatID int64) *BotResponse {
 	p := new(BotResponse)
-    p.Sid = sid
+	p.Sid = sid
 	p.ChatID = chatID
-    return p
+	return p
+}
+
+func NewFileBotResponse(filePath string, chatID int64) *BotResponse {
+	p := new(BotResponse)
+	p.FilePath = filePath
+	p.ChatID = chatID
+	return p
 }
