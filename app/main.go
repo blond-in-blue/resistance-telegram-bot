@@ -198,14 +198,14 @@ func getCommands() []BotCommand {
 					Size: 70,
 				})
 
-				for i := 0; i < 4; i++ {
+				for i := 0; i < 9; i++ {
 					im, err := gg.LoadPNG(fmt.Sprintf("trunks2/F_00%d.png", i))
 					if err != nil {
 						bot.errorReport.Log("unable to load image: " + err.Error())
 						return
 					}
 					dc := gg.NewContextForImage(im)
-					dc.SetRGB(1, 1, 1)
+					dc.SetRGB(1, 0, 0)
 					dc.SetFontFace(face)
 					dc.DrawStringAnchored(update.Message.From.UserName, 950, 120, 0.0, 0.0)
 					dc.DrawStringAnchored(name, 750, 600, 0.0, 0.0)
