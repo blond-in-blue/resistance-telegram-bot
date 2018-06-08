@@ -1,7 +1,7 @@
-FROM golang
+FROM golang:1.9
 
 ENV MAGICK_URL "https://www.imagemagick.org/download"
-ENV MAGICK_VERSION 7.0.7-31
+ENV MAGICK_VERSION 7.0.7-38
 
 RUN apt-get update -y \
   && apt-get install -y xz-utils  \

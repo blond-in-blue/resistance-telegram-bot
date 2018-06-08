@@ -71,11 +71,12 @@ func (telebot *TeleBot) PushMessageToChatBuffer(lookup string, message Message) 
 	telebot.chatBuffers[location] = telebot.chatBuffers[location].Push(message)
 }
 
-func (telebot *TeleBot) ClearBuffer(chatID int64) <-chan Message {
+// ClearBuffer clears the chat's buffer and returns what has been removed
+func (telebot *TeleBot) ClearBuffer(chatID int64) MessageStack {
 	lookup := strconv.FormatInt(chatID, 10)
 	buffer := telebot.chatBuffers[lookup]
 	telebot.chatBuffers[lookup] = make([]Message, 0)
-	return buffer.Everything()
+	return buffer
 }
 
 // ChatBuffer returns the buffer for a specific chat given the lookup
@@ -171,7 +172,7 @@ func (telebot *TeleBot) GetUpdates() ([]Update, error) {
 }
 
 // GetImage Downloads an image by its file id and returns the filepath on the system
-func (telebot TeleBot) GetImage(fileID string) (string, error) {
+func (telebot TeleBot) GetFile(fileID string) (string, error) {
 	resp, err := http.Get(fmt.Sprintf("%sgetFile?file_id=%s", telebot.url, fileID))
 
 	log.Println("Begining download")

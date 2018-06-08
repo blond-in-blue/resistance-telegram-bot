@@ -8,6 +8,10 @@ func (s MessageStack) Push(v Message) MessageStack {
 	return append(s, v)
 }
 
+func (s MessageStack) Size() int {
+	return len(s)
+}
+
 // Pop returns a stack without the top element and returns the top elemtns
 func (s MessageStack) Pop() (MessageStack, Message) {
 

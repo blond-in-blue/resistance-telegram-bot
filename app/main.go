@@ -126,12 +126,14 @@ func getCommands() []BotCommand {
 				bot.PushMessageToChatBuffer(strconv.FormatInt(update.Message.Chat.ID, 10), *update.Message.ReplyToMessage)
 				if update.Message.ReplyToMessage.Photo != nil {
 					photos := *update.Message.ReplyToMessage.Photo
-					go bot.GetImage(photos[0].FileID)
+					go bot.GetFile(photos[0].FileID)
 				}
+
 				if update.Message.ReplyToMessage.Sticker != nil {
 					sticker := *update.Message.ReplyToMessage.Sticker
-					go bot.GetImage(sticker.FileID)
+					go bot.GetFile(sticker.FileID)
 				}
+
 				go bot.deleteMessage(update.Message.Chat.ID, update.Message.ReplyToMessage.MessageID)
 				go bot.deleteMessage(update.Message.Chat.ID, update.Message.MessageID)
 				respChan <- *NewTextBotResponse(fmt.Sprintf("%s edged %s", update.Message.From.UserName, update.Message.ReplyToMessage.From.UserName), update.Message.Chat.ID)
@@ -146,8 +148,9 @@ func getCommands() []BotCommand {
 			},
 			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
 				msgSentCount := 0
-				for msg := range bot.ClearBuffer(update.Message.Chat.ID) {
-					msgSentCount += 1
+				buffer := bot.ClearBuffer(update.Message.Chat.ID)
+				for msg := range buffer.Everything() {
+					msgSentCount++
 					if msg.Photo != nil {
 						photos := *msg.Photo
 						respChan <- *NewTextBotResponse(msg.From.UserName+" sent:", update.Message.Chat.ID)
@@ -155,6 +158,9 @@ func getCommands() []BotCommand {
 					} else if msg.Sticker != nil {
 						respChan <- *NewTextBotResponse(msg.From.UserName+" sent:", update.Message.Chat.ID)
 						respChan <- *NewStickerBotResponse(msg.Sticker.FileID, update.Message.Chat.ID)
+					} else if msg.Document != nil {
+						respChan <- *NewTextBotResponse(msg.From.UserName+" sent:", update.Message.Chat.ID)
+						respChan <- *NewStickerBotResponse(msg.Document.FileID, update.Message.Chat.ID)
 					} else {
 						respChan <- *NewTextBotResponse(fmt.Sprintf("%s sent:\n%s", msg.From.UserName, msg.Text), update.Message.Chat.ID)
 					}
@@ -238,174 +244,10 @@ func getCommands() []BotCommand {
 		hedgehogCommand,
 		saveCommand,
 		pokedexCommand,
+		swallowCommand,
+		doitCommand,
 	}
-	/*
-		return []func(){
 
-			// Reactions
-			func(update Update) {
-				for key, value := range reactions {
-					matches, _ := getContentFromCommand(update.Message.Text, key)
-					if matches {
-						go telebot.SendMessage(value, update.Message.Chat.ID)
-					}
-				}
-			},
-
-			func(update Update) {
-				matches, toMatch := getContentFromCommand(update.Message.Text, "s/")
-				if matches && toMatch != "" && update.Message.ReplyToMessage != nil {
-
-					aggMessage := update.Message.ReplyToMessage.Text
-
-					for _, line := range strings.SplitAfter(toMatch, "\n") {
-						cmds := strings.Split(line, "/")
-
-						if len(cmds) != 2 {
-							return
-						}
-
-						re, err := regexp.Compile(cmds[0])
-
-						if err == nil {
-							aggMessage = re.ReplaceAllString(aggMessage, strings.TrimSpace(cmds[1]))
-						} else {
-							go telebot.SendMessage(fmt.Sprintf("<b>Invalid expression:</b>\n%s", err.Error()), update.Message.Chat.ID)
-						}
-
-					}
-
-					if aggMessage != update.Message.ReplyToMessage.Text {
-						go telebot.SendMessage(fmt.Sprintf("<b>Did you mean</b>:\n%s", aggMessage), update.Message.Chat.ID)
-					}
-
-				}
-			},
-
-			func(update Update) {
-				matches, commands := getContentFromCommand(update.Message.Text, "murder")
-				if matches && commands != "" {
-
-					if commands == "me" {
-						commands = update.Message.From.UserName
-					}
-
-					im, err := gg.LoadPNG("murder/test.png")
-					if err != nil {
-						telebot.errorReport.Log("unable to load image: " + err.Error())
-						return
-					}
-					dc := gg.NewContextForImage(im)
-
-					dc.SetRGB(1, 1, 1)
-					font, err := truetype.Parse(goregular.TTF)
-					if err != nil {
-						telebot.errorReport.Log(err.Error())
-					}
-					face := truetype.NewFace(font, &truetype.Options{
-						Size: 70,
-					})
-
-					dc.SetFontFace(face)
-					dc.DrawStringAnchored(commands, 500, 120, 0.0, 0.0)
-					dc.SavePNG("media/out.png")
-					telebot.sendImage("media/out.png", update.Message.Chat.ID)
-				}
-			},
-			func(update Update) {
-				matches, commands := getContentFromCommand(update.Message.Text, "fight")
-				if matches && commands != "" {
-
-					fighters := strings.Split(commands, " and ")
-
-					if len(fighters) < 2 {
-						return
-					}
-
-					left := strings.TrimSpace(fighters[0])
-					right := strings.TrimSpace(fighters[1])
-
-					if left == "me" {
-						left = update.Message.From.UserName
-					}
-
-					if right == "me" {
-						right = update.Message.From.UserName
-					}
-
-					im, err := gg.LoadPNG("murder/rooster fighting.png")
-					if err != nil {
-						telebot.errorReport.Log("unable to load image: " + err.Error())
-						return
-					}
-					dc := gg.NewContextForImage(im)
-
-					dc.SetRGB(1, 1, 1)
-					font, err := truetype.Parse(goregular.TTF)
-					if err != nil {
-						telebot.errorReport.Log(err.Error())
-					}
-					face := truetype.NewFace(font, &truetype.Options{
-						Size: 70,
-					})
-
-					dc.SetFontFace(face)
-					dc.DrawStringAnchored(left, 300, 200, 0.0, 0.0)
-					dc.DrawStringAnchored(right, 1200, 180, 0.0, 0.0)
-					dc.SavePNG("media/roosterOut.png")
-					telebot.sendImage("media/roosterOut.png", update.Message.Chat.ID)
-				}
-
-			},
-
-			func(update Update) {
-				matches, commands := getContentFromCommand(update.Message.Text, "hunt")
-				if matches && commands != "" {
-
-					fighters := strings.Split(commands, " and ")
-
-					if len(fighters) < 2 {
-						return
-					}
-
-					left := strings.TrimSpace(fighters[0])
-					right := strings.TrimSpace(fighters[1])
-
-					if left == "me" {
-						left = update.Message.From.UserName
-					}
-
-					if right == "me" {
-						right = update.Message.From.UserName
-					}
-
-					im, err := gg.LoadPNG("murder/hunt.png")
-					if err != nil {
-						telebot.errorReport.Log("unable to load image: " + err.Error())
-						return
-					}
-					dc := gg.NewContextForImage(im)
-
-					dc.SetRGB(1, 1, 1)
-					font, err := truetype.Parse(goregular.TTF)
-					if err != nil {
-						telebot.errorReport.Log(err.Error())
-					}
-					face := truetype.NewFace(font, &truetype.Options{
-						Size: 40,
-					})
-
-					dc.SetFontFace(face)
-					dc.DrawStringAnchored(left, 100, 220, 0.0, 0.0)
-					dc.DrawStringAnchored(right, 300, 375, 0.0, 0.0)
-					dc.SavePNG("media/huntOut.png")
-					telebot.sendImage("media/huntOut.png", update.Message.Chat.ID)
-
-				}
-
-			},
-		}
-	*/
 }
 
 // Create our routes
