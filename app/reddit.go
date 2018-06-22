@@ -161,7 +161,7 @@ var saveCommand = BotCommand{
 		if urlRegex.FindString(update.Message.ReplyToMessage.Text) == update.Message.ReplyToMessage.Text {
 			post = update.Message.ReplyToMessage.Text
 		} else {
-			post = fmt.Sprintf("%s:\n\n%s", update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.Text)
+			post = fmt.Sprintf("%s saved %s:\n\n%s", update.Message.From.UserName, update.Message.ReplyToMessage.From.UserName, update.Message.ReplyToMessage.Text)
 		}
 
 		info, err := bot.redditUser.PostToSubreddit(post, term, "smartestretards")
