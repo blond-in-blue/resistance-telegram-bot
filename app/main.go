@@ -77,6 +77,15 @@ func getCommands() []BotCommand {
 				respChan <- *NewTextBotResponse("fuck you want?", update.Message.Chat.ID)
 			},
 		},
+		
+		BotCommand{
+			Name:        "wuh",
+			Description: "stop fucking stop",
+			Matcher:     messageContainsCommandMatcher("wuh"),
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				respChan <- *NewTextBotResponse("https://www.youtube.com/watch?v=j3z7vjs1E18", update.Message.Chat.ID)
+			},
+		},
 
 		BotCommand{
 			Name:        "Alias Set",
