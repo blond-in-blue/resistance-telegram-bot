@@ -77,7 +77,7 @@ func getCommands() []BotCommand {
 				respChan <- *NewTextBotResponse("fuck you want?", update.Message.Chat.ID)
 			},
 		},
-		
+
 		BotCommand{
 			Name:        "wuh",
 			Description: "stop fucking stop",
@@ -255,6 +255,7 @@ func getCommands() []BotCommand {
 		pokedexCommand,
 		swallowCommand,
 		doitCommand,
+		repostCommand,
 	}
 
 }

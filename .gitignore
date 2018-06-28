@@ -4,3 +4,7 @@ node_modules
 app/gin-bin
 
 app/media/*
+
+app/repost/*
+
+*.gif
