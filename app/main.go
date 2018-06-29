@@ -88,6 +88,17 @@ func getCommands() []BotCommand {
 		},
 
 		BotCommand{
+			Name:        "Ahem",
+			Description: "You are a furry arn't you",
+			Matcher: func(update Update) bool {
+				return update.Message.Text == "ahem" && update.Message.ReplyToMessage != nil
+			},
+			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
+				respChan <- *NewTextBotResponse(fmt.Sprintf("%s is actually the furry", update.Message.ReplyToMessage.From.UserName), update.Message.Chat.ID)
+			},
+		},
+
+		BotCommand{
 			Name:        "Alias Set",
 			Description: "Alias the chat for other commands like edge, <code>/alias-set resistance</code>",
 			Matcher:     messageContainsCommandMatcher("alias-set"),
