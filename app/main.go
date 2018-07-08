@@ -71,7 +71,7 @@ func getCommands() []BotCommand {
 
 		BotCommand{
 			Name:        "ping",
-			Description: "check if the bot is listenting",
+			Description: "check if the bot is listening",
 			Matcher:     messageContainsCommandMatcher("ping"),
 			Execute: func(bot TeleBot, update Update, respChan chan BotResponse) {
 				respChan <- *NewTextBotResponse("fuck you want?", update.Message.Chat.ID)
@@ -267,6 +267,7 @@ func getCommands() []BotCommand {
 		swallowCommand,
 		doitCommand,
 		repostCommand,
+		mockCommand,
 	}
 
 }
