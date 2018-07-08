@@ -8,3 +8,4 @@ app/media/*
 app/repost/*
 
 *.gif
+.DS_Store
