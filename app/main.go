@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+
 	// "math/rand"
 	"net/http"
 	"os"
@@ -254,7 +255,7 @@ func getCommands() []BotCommand {
 				}
 
 				StichPicturesTogether("trunks2out")
-				respChan <- *NewFileBotResponse("movie.gif", update.Message.Chat.ID)
+				respChan <- *NewFileBotResponse("movie.mp4", update.Message.Chat.ID)
 			},
 		},
 

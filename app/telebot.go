@@ -264,7 +264,7 @@ func (telebot TeleBot) sendFile(path string, chatID int64) {
 	}
 	defer file.Close()
 
-	if fw, err = w.CreateFormFile("document", "movie.gif"); err != nil {
+	if fw, err = w.CreateFormFile("document", "movie.mp4"); err != nil {
 		telebot.errorReport.Log(err.Error())
 	}
 
